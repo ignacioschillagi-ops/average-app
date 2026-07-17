@@ -988,6 +988,9 @@ export default function GymRoutineApp() {
   const dayNodesRef = useRef({});
   const prevDayRectsRef = useRef({});
   const [justMovedIds, setJustMovedIds] = useState([]);
+  const prevVariantIndexRef = useRef(null);
+  const [slideDir, setSlideDir] = useState('right');
+  const [transitionKey, setTransitionKey] = useState(0);
 
   useEffect(() => {
     const t = setTimeout(() => setShowSplash(false), 3000);
@@ -1018,6 +1021,17 @@ export default function GymRoutineApp() {
     }, 500);
     return () => clearTimeout(saveTimer.current);
   }, [data, loaded]);
+
+  useEffect(() => {
+    if (!loaded || !data) return;
+    const idx = data.variants.findIndex((v) => v.id === data.activeVariant);
+    if (prevVariantIndexRef.current !== null && idx !== -1 && idx !== prevVariantIndexRef.current) {
+      setSlideDir(idx > prevVariantIndexRef.current ? 'right' : 'left');
+      setTransitionKey((k) => k + 1);
+    }
+    if (idx !== -1) prevVariantIndexRef.current = idx;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data ? data.activeVariant : null, loaded]);
 
   // Animación FLIP: cuando un día cambia de posición (por ejemplo al reasignarle otro día
   // de la semana), lo desliza suavemente desde donde estaba hasta su nuevo lugar, en vez
@@ -1210,7 +1224,7 @@ export default function GymRoutineApp() {
     if (touchStartX.current === null) return;
     const deltaX = e.changedTouches[0].clientX - touchStartX.current;
     touchStartX.current = null;
-    if (Math.abs(deltaX) < 60 || data.variants.length < 2) return;
+    if (Math.abs(deltaX) < 100 || data.variants.length < 2) return;
     shiftVariant(deltaX < 0 ? 1 : -1);
   };
 
@@ -1332,7 +1346,12 @@ export default function GymRoutineApp() {
         </div>
       )}
 
-      <main className="day-grid" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      <main
+        key={transitionKey}
+        className={`day-grid day-grid-slide-${slideDir}`}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         {sortedDays.map((d) => (
           <DayCard
             key={d.id}
@@ -1795,6 +1814,17 @@ const styles = `
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 16px;
+}
+
+.day-grid-slide-right { animation: slide-in-right 280ms ease; }
+.day-grid-slide-left { animation: slide-in-left 280ms ease; }
+@keyframes slide-in-right {
+  0% { opacity: 0; transform: translateX(28px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes slide-in-left {
+  0% { opacity: 0; transform: translateX(-28px); }
+  100% { opacity: 1; transform: translateX(0); }
 }
 
 .day-card {
