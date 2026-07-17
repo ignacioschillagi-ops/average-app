@@ -124,7 +124,7 @@ const TEMPLATES = [
   {
     id: 'fullbody4',
     name: 'Full Body · 4 días',
-    description: 'Fuerza, posterior, anterior y metabólico. Con dos variantes por día.',
+    description: 'Fuerza, posterior, anterior y metabólico.',
     build: () => ({
       title: 'Tu rutina',
       activeVariant: 'A',
@@ -154,34 +154,6 @@ const TEMPLATES = [
               ex('Remo o battle rope', '30 seg'), ex('Plancha frontal', '45 seg'),
               ex('Curl bíceps (barra + martillo)', '3x12-15 c/u'),
               ex('Tríceps cuerda + fondos', '3x15 c/u'), ex('Core (elevaciones + oblicuos polea)', '3x20'),
-            ]),
-          ],
-        },
-        {
-          id: 'B', name: 'Rutina B', color: VARIANT_PALETTE[1],
-          days: [
-            dayDef('Lunes', 'fuerza', 'FUERZA', [
-              ex('Sentadilla frontal', '4x5'), ex('Press banca inclinado barra', '4x5'),
-              ex('Peso muerto sumo', '3x5'), ex('Dominadas pronas estrictas', '3x5'),
-              ex('Push press', '3x6'), ex('Core: Farmer walk o plancha con peso', '3 series + 30s'),
-            ]),
-            dayDef('Martes', 'posterior', 'POSTERIOR', [
-              ex('Peso muerto sumo', '4x10'), ex('Dominadas neutras', '4x10'),
-              ex('Hip thrust 1 pierna', '4x12 c/p'), ex('Remo T-bar o máquina', '3x12'),
-              ex('Face pulls cuerda', '3x15'), ex('Abducciones banda', '3x20'),
-              ex('Core: plancha + oblicuos', '45s x 4'),
-            ]),
-            dayDef('Jueves', 'anterior', 'ANTERIOR', [
-              ex('Sentadilla búlgara', '4x10'), ex('Press banca plano mancuernas', '4x10'),
-              ex('Reverse lunges', '3x12 c/pierna'), ex('Aperturas pec deck / poleas', '3x15 c/u'),
-              ex('Press militar mancuernas', '3x10'), ex('Elevaciones laterales en polea', '3x15'),
-              ex('Core: crunch bici + hollow hold', '3x15 + 30s'),
-            ]),
-            dayDef('Viernes', 'metabolico', 'METABÓLICO', [
-              ex('Thrusters mancuerna', '10'), ex('KB clean & press', '8 c/brazo'),
-              ex('Flexiones con palmada', '12'), ex('Remo invertido TRX/barra', '12'),
-              ex('Jumping lunges', '12 (6 c/pierna)'), ex('Plancha con toques hombro', '20'),
-              ex('Curl mancuerna + overhead tricep', '3x12-15 c/u'), ex('Ab wheel', '3x10-15'),
             ]),
           ],
         },
