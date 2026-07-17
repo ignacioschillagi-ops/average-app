@@ -124,7 +124,7 @@ const TEMPLATES = [
   {
     id: 'fullbody4',
     name: 'Full Body · 4 días',
-    description: 'Fuerza, posterior, anterior y metabólico.',
+    description: 'Fuerza, posterior, anterior y máquinas.',
     build: () => ({
       title: 'Tu rutina',
       activeVariant: 'A',
@@ -149,11 +149,11 @@ const TEMPLATES = [
               ex('Extensión de cuádriceps', '3x15'), ex('Extensión de tríceps con cuerda o fondos', '3x12'),
               ex('Core: Crunch bici + plancha lateral', '3x15 + 30s por lado'),
             ]),
-            dayDef('Viernes', 'metabolico', 'METABÓLICO', [
-              ex('Kettlebell swings', '15 reps'), ex('Burpees', '10 reps'), ex('Box jumps', '10 reps'),
-              ex('Remo o battle rope', '30 seg'), ex('Plancha frontal', '45 seg'),
-              ex('Curl bíceps (barra + martillo)', '3x12-15 c/u'),
-              ex('Tríceps cuerda + fondos', '3x15 c/u'), ex('Core (elevaciones + oblicuos polea)', '3x20'),
+            dayDef('Viernes', 'metabolico', 'MÁQUINAS', [
+              ex('Dorsalera libre', '15-12-10-8-6'), ex('Inclinado máquina', '15-12-10-8-6'),
+              ex('Militar máquina', '15-12-10-8-6'),
+              ex('Curl bíceps (barra + martillo)', '3x15 c/u'),
+              ex('Tríceps cuerda + fondos', '3x15 c/u'), ex('Core (elevaciones + oblicuos polea)', '3x20 c/u'),
             ]),
           ],
         },
