@@ -469,7 +469,7 @@ const storage = {
 function BrandFooter() {
   return (
     <div className="app-footer">
-      <img src={FAVICON_DATA_URI} alt="Averas Joe's" className="footer-logo" />
+      <img src={FAVICON_DATA_URI} alt="Average Joe's" className="footer-logo" />
       <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" className="footer-credit">
         By @YoSoyJoe
       </a>
@@ -484,7 +484,7 @@ function SplashScreen() {
     <div className="app-root splash-root">
       <style>{styles}</style>
       <div className="splash-content">
-        <img src={LOGO_DATA_URI} alt="Averas Joe's" className="splash-logo" />
+        <img src={LOGO_DATA_URI} alt="Average Joe's" className="splash-logo" />
       </div>
     </div>
   );
@@ -516,6 +516,31 @@ function TemplatePicker({ onPick }) {
   );
 }
 
+// ---------- Agregar rutina nueva (desde dentro de la app) ----------
+
+function TemplateBrowserModal({ onPick, onClose }) {
+  return (
+    <div className="help-overlay" onClick={onClose}>
+      <div className="template-browser-box" onClick={(e) => e.stopPropagation()}>
+        <button className="icon-btn help-close" onClick={onClose} aria-label="Cerrar"><X size={16} /></button>
+        <div className="picker-header">
+          <Dumbbell size={24} strokeWidth={2.2} />
+          <h1>Agregar una rutina nueva</h1>
+          <p>Elegí una base clásica. Se suma a las que ya tenés, sin tocarlas.</p>
+        </div>
+        <div className="template-grid">
+          {TEMPLATES.map((t) => (
+            <button key={t.id} className="template-card" onClick={() => onPick(t)}>
+              <span className="template-name">{t.name}</span>
+              <span className="template-desc">{t.description}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------- Ayuda ----------
 
 function HelpModal({ onClose }) {
@@ -523,7 +548,7 @@ function HelpModal({ onClose }) {
     <div className="help-overlay" onClick={onClose}>
       <div className="help-box" onClick={(e) => e.stopPropagation()}>
         <button className="icon-btn help-close" onClick={onClose} aria-label="Cerrar"><X size={16} /></button>
-        <img src={LOGO_DATA_URI} alt="Averas Joe's" className="help-logo" />
+        <img src={LOGO_DATA_URI} alt="Average Joe's" className="help-logo" />
         <h2 className="help-title">¿Qué es esta app?</h2>
         <p>
           Es tu organizador de rutinas de entrenamiento: pensala como una carpeta con todas
@@ -977,6 +1002,7 @@ export default function GymRoutineApp() {
   const [needsTemplate, setNeedsTemplate] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showTemplateBrowser, setShowTemplateBrowser] = useState(false);
   const [showVariantMenu, setShowVariantMenu] = useState(false);
   const [confirmState, setConfirmState] = useState(null);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -1368,11 +1394,22 @@ export default function GymRoutineApp() {
         </button>
       </div>
 
+      <button className="add-routine-link" onClick={() => setShowTemplateBrowser(true)}>
+        + Agregar rutina nueva
+      </button>
+
       <BrandFooter />
 
       <FloatingTimer />
 
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+
+      {showTemplateBrowser && (
+        <TemplateBrowserModal
+          onClose={() => setShowTemplateBrowser(false)}
+          onPick={(t) => { addVariant(t); setShowTemplateBrowser(false); }}
+        />
+      )}
 
       <ConfirmDialog state={confirmState} onCancel={closeConfirm} onConfirm={confirmAndRun} />
     </div>
@@ -1971,6 +2008,37 @@ const styles = `
 }
 
 .bottom-actions { max-width: 980px; margin: 24px auto 0; display: flex; flex-wrap: wrap; gap: 10px; }
+
+.add-routine-link {
+  display: block;
+  max-width: 980px;
+  margin: 14px auto 0;
+  background: none;
+  border: none;
+  color: #6B6A65;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  width: 100%;
+  cursor: pointer;
+  padding: 6px;
+}
+.add-routine-link:hover { color: #EDEAE3; text-decoration: underline; }
+
+.template-browser-box {
+  position: relative;
+  background: #1C1D20;
+  border: 1px solid #2E2F33;
+  border-radius: 16px;
+  padding: 28px 26px 26px;
+  max-width: 760px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.template-browser-box .picker-header { margin-bottom: 22px; }
 
 .add-day-btn, .reset-week-btn {
   display: flex; align-items: center; gap: 8px; background: #1C1D20; border: 1px dashed #3A3B3F;
