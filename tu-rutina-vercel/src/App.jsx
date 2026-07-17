@@ -34,7 +34,7 @@ const MOTIVATIONAL_PHRASES = [
   'Ese chivo sí se puede ver. Andá a bañarte nomás...',
   'Completaste todo, esas patas de pollo te lo agradecen.',
   '¡Día ganado! Ya estás disimulando esa cara de artesanía prehispánica.',
-  'Rutina cerrada. A descansar, que te lo ganaste, desgarbado.',
+  'Rutina cerrada por hoy. Ya sos menos desgarbado que ayer.',
   'Lista completa. No hiciste más que cumplir con tu tarea.',
 ];
 
