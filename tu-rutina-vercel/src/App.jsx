@@ -468,6 +468,13 @@ const buildSystemPrompt = (data) => {
     p.notes ? `Notas: ${p.notes}` : null,
   ].filter(Boolean).join('\n');
 
+  const missingProfileFields = [
+    !p.height ? 'altura' : null,
+    !p.weight ? 'peso' : null,
+    !p.yearsTraining ? 'años entrenando' : null,
+    !p.notes ? 'lesiones o preferencias' : null,
+  ].filter(Boolean);
+
   const routinesText = (data.variants || []).map((v) => {
     const daysText = (v.days || []).map((d) => {
       const exList = (d.list || []).map((e) => `${e.name} (${e.sets})`).join(', ');
@@ -485,6 +492,10 @@ Rutinas que ya tiene cargadas:
 ${routinesText || 'Todavía no tiene ninguna rutina cargada.'}
 
 Tu trabajo: responder dudas, dar consejos de entrenamiento acordes a su perfil, ayudar a organizar sus rutinas, y si te piden armar una rutina nueva, proponerla.
+
+${missingProfileFields.length > 0 ? `Le falta cargar en el perfil: ${missingProfileFields.join(', ')}. En algún momento natural de la charla (sin ser pesado, sin interrumpir lo que te esté pidiendo, y sin repetirlo si ya se lo dijiste antes en esta misma conversación) motivalo a completarlo en la pestaña "Perfil", explicándole que con esos datos le podés armar un entrenamiento más ajustado a él.` : ''}
+
+Antes de proponer o armar CUALQUIER rutina nueva, preguntale SIEMPRE cuántos días a la semana puede entrenar y cuántas horas tiene disponibles por día — sin excepción, aunque ya tengas otras rutinas suyas cargadas. Si no te lo dijo todavía en esta conversación, preguntaselo primero y esperá su respuesta antes de generar el bloque "routine". Si ya te lo dijo antes en la misma charla, no hace falta volver a preguntar. Usá esa info para que la cantidad de días y el volumen de ejercicios por día tengan sentido con el tiempo real que tiene disponible.
 
 Si proponés una rutina nueva, además de explicarla brevemente en tu respuesta, agregá AL FINAL un bloque de código con el lenguaje "routine" y un JSON con esta forma EXACTA (nada más adentro del bloque, sin comentarios):
 \`\`\`routine
@@ -1297,7 +1308,17 @@ function ChatScreen({ messages, onSend, loading, error, onAddRoutine, onChangeKe
                   </div>
                   <div className="routine-proposal-days">
                     {(m.proposal.days || []).map((d, i) => (
-                      <span key={i} className="routine-proposal-day">{d.weekday}: {d.focus}</span>
+                      <div key={i} className="routine-proposal-day-block">
+                        <div className="routine-proposal-day-head">{d.weekday} · {d.focus}</div>
+                        <ul className="routine-proposal-ex-list">
+                          {(d.exercises || []).map((e, j) => (
+                            <li key={j}>
+                              <span className="routine-proposal-ex-name">{e.name}</span>
+                              <span className="routine-proposal-ex-sets">{e.sets}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     ))}
                   </div>
                   {m.added ? (
@@ -3270,14 +3291,43 @@ const styles = `
   color: #EDEAE3;
   margin-bottom: 6px;
 }
-.routine-proposal-days { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
-.routine-proposal-day {
+.routine-proposal-days { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.routine-proposal-day-block {
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.routine-proposal-day-head {
   font-family: 'JetBrains Mono', monospace;
   font-size: 10.5px;
-  color: #B0AFA9;
-  background: rgba(255,255,255,0.06);
-  padding: 3px 7px;
-  border-radius: 5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #B08D57;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.routine-proposal-ex-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.routine-proposal-ex-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: #EDEAE3;
+}
+.routine-proposal-ex-name { flex: 1; }
+.routine-proposal-ex-sets {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #8B8A85;
+  white-space: nowrap;
 }
 .routine-proposal-btn {
   width: 100%;
