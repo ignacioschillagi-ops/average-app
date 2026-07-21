@@ -26,6 +26,8 @@ export default defineConfig({
         // una vez que se abrió al menos una vez. El chat con Joe's sigue necesitando
         // internet siempre, porque habla en vivo con la API de Groq (no se cachea).
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        // og-image.png es solo para el preview al compartir el link, la app nunca la carga.
+        globIgnores: ['**/og-image.png'],
       },
     }),
   ],
