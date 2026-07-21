@@ -499,11 +499,11 @@ ${missingProfileFields.length > 0 ? `Le falta cargar en el perfil: ${missingProf
 
 Antes de proponer o armar CUALQUIER rutina nueva, preguntale SIEMPRE cuántos días a la semana puede entrenar y cuántas horas tiene disponibles por día — sin excepción, aunque ya tengas otras rutinas suyas cargadas. Si no te lo dijo todavía en esta conversación, preguntaselo primero y esperá su respuesta antes de generar el bloque "routine". Si ya te lo dijo antes en la misma charla, no hace falta volver a preguntar. Usá esa info para que la cantidad de días y el volumen de ejercicios por día tengan sentido con el tiempo real que tiene disponible.
 
-Si proponés una rutina nueva, además de explicarla brevemente en tu respuesta, agregá AL FINAL un bloque de código con el lenguaje "routine" y un JSON con esta forma EXACTA (nada más adentro del bloque, sin comentarios):
+Si proponés una rutina nueva, tu respuesta en texto tiene que ser BREVE (2-3 frases como mucho, sin listar los ejercicios uno por uno — eso ya lo muestra la tarjeta que se arma sola a partir del bloque de datos, no hace falta que lo repitas). Todo el detalle real va únicamente en un bloque de código con el lenguaje "routine" al final, con un JSON con esta forma EXACTA (nada más adentro del bloque, sin comentarios):
 \`\`\`routine
 {"name": "Nombre corto de la rutina", "days": [{"weekday": "Lunes", "focus": "EMPUJE", "exercises": [{"name": "Press banca", "sets": "4x8"}]}]}
 \`\`\`
-Usá días reales de la semana (Lunes, Martes, Miércoles, Jueves, Viernes, Sábado, Domingo) sin repetir ninguno dentro de la misma rutina. El campo "focus" es una etiqueta corta en mayúsculas de qué se entrena ese día (por ejemplo FUERZA, PUSH, PIERNA). No propongas una rutina nueva si no te la piden explícitamente.
+Ese JSON tiene que incluir TODOS los ejercicios de TODOS los días, completo, sin resumir ni acortar la lista bajo ningún motivo — es la única fuente real de la rutina, no una muestra. Usá días reales de la semana (Lunes, Martes, Miércoles, Jueves, Viernes, Sábado, Domingo) sin repetir ninguno dentro de la misma rutina. El campo "focus" es una etiqueta corta en mayúsculas de qué se entrena ese día (por ejemplo FUERZA, PUSH, PIERNA). No propongas una rutina nueva si no te la piden explícitamente.
 
 Cada vez que le mostrás una rutina nueva a la persona (recién armada), preguntale al final si tiene dudas sobre cómo se hace alguno de los ejercicios.
 
@@ -515,16 +515,29 @@ El campo "query" es el nombre del ejercicio tal como lo dijo la persona, en espa
 };
 
 // Busca un bloque \`\`\`routine ... \`\`\` en la respuesta y lo separa del texto para mostrar.
+const TRUNCATED_ROUTINE_MESSAGE = 'Uy, se me cortó armando la rutina a la mitad. ¿Me pedís que la vuelva a mandar? (si tiene muchos ejercicios por día, puedo achicarla un poco para que entre bien)';
+
 const extractRoutineProposal = (text) => {
   const match = text.match(/```routine\s*([\s\S]*?)```/);
-  if (!match) return { cleanText: text, proposal: null };
-  const cleanText = (text.slice(0, match.index) + text.slice(match.index + match[0].length)).trim();
-  try {
-    const parsed = JSON.parse(match[1]);
-    return { cleanText, proposal: parsed };
-  } catch (e) {
-    return { cleanText, proposal: null };
+  if (match) {
+    const cleanText = (text.slice(0, match.index) + text.slice(match.index + match[0].length)).trim();
+    try {
+      const parsed = JSON.parse(match[1]);
+      return { cleanText, proposal: parsed };
+    } catch (e) {
+      // El bloque cerró pero el JSON de adentro quedó roto (probablemente cortado a mitad).
+      const cleanBefore = text.slice(0, match.index).trim();
+      return { cleanText: cleanBefore || TRUNCATED_ROUTINE_MESSAGE, proposal: null };
+    }
   }
+  // Abrió el bloque de rutina pero la respuesta se cortó antes de cerrarlo: no mostramos
+  // el JSON a medio escribir como si fuera texto normal, avisamos y listo.
+  const openMatch = text.match(/```routine([\s\S]*)$/);
+  if (openMatch) {
+    const cleanBefore = text.slice(0, openMatch.index).trim();
+    return { cleanText: cleanBefore || TRUNCATED_ROUTINE_MESSAGE, proposal: null };
+  }
+  return { cleanText: text, proposal: null };
 };
 
 // Busca un bloque \`\`\`exercise-lookup ... \`\`\` (pedido de Joe's de consultar un ejercicio puntual).
@@ -586,7 +599,7 @@ const callGroq = async (apiKey, messages) => {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({ model: GROQ_MODEL, messages, temperature: 0.7, max_tokens: 1024 }),
+    body: JSON.stringify({ model: GROQ_MODEL, messages, temperature: 0.7, max_tokens: 2048 }),
   });
   if (!res.ok) {
     let detail = '';
