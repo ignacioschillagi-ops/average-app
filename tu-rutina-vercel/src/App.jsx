@@ -664,7 +664,7 @@ function TemplateBrowserModal({ onPick, onClose }) {
       <div className="picker-wrap">
         <div className="picker-header">
           <Dumbbell size={26} strokeWidth={2.2} />
-          <h1>Agregar una rutina nueva</h1>
+          <h1>Agregar una rutina prearmada</h1>
           <p>Elegí una base clásica. Se suma a las que ya tenés, sin tocarlas.</p>
         </div>
         <div className="template-grid">
