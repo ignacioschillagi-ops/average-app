@@ -744,13 +744,15 @@ function ProfileFaq() {
 
 function ConfirmDialog({ state, onCancel, onConfirm }) {
   if (!state) return null;
+  const label = state.confirmLabel || 'Eliminar';
+  const variant = state.variant || 'danger';
   return (
     <div className="confirm-overlay" onClick={onCancel}>
       <div className="confirm-box" onClick={(e) => e.stopPropagation()}>
         <p className="confirm-message">{state.message}</p>
         <div className="confirm-actions">
           <button className="confirm-btn cancel" onClick={onCancel}>Cancelar</button>
-          <button className="confirm-btn danger" onClick={onConfirm}>Eliminar</button>
+          <button className={`confirm-btn ${variant}`} onClick={onConfirm}>{label}</button>
         </div>
       </div>
     </div>
@@ -759,7 +761,7 @@ function ConfirmDialog({ state, onCancel, onConfirm }) {
 
 // ---------- Ejercicio ----------
 
-function ExerciseRow({ exercise, editMode, onUpdate, onDelete, onToggleDone, setNodeRef, onHandlePointerDown, isDragging, isOver }) {
+function ExerciseRow({ exercise, editMode, saveSignal, onUpdate, onDelete, onToggleDone, setNodeRef, onHandlePointerDown, isDragging, isOver }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(exercise.name);
   const [sets, setSets] = useState(exercise.sets);
@@ -769,6 +771,13 @@ function ExerciseRow({ exercise, editMode, onUpdate, onDelete, onToggleDone, set
     onUpdate({ ...exercise, name: name.trim() || exercise.name, sets: sets.trim() || exercise.sets, weight: weight.trim() });
     setEditing(false);
   };
+
+  // Si tocás el botón global de guardar mientras esta fila todavía está en edición
+  // (sin haber tocado el tilde), igual aplicamos el cambio pendiente en vez de perderlo.
+  useEffect(() => {
+    if (editing) save();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveSignal]);
 
   if (editing) {
     return (
@@ -783,7 +792,6 @@ function ExerciseRow({ exercise, editMode, onUpdate, onDelete, onToggleDone, set
           inputMode="decimal"
         />
         <button className="icon-btn confirm" onClick={save} aria-label="Guardar"><Check size={15} /></button>
-        <button className="icon-btn" onClick={() => setEditing(false)} aria-label="Cancelar"><X size={15} /></button>
       </div>
     );
   }
@@ -826,7 +834,7 @@ function ExerciseRow({ exercise, editMode, onUpdate, onDelete, onToggleDone, set
 
 // ---------- Día ----------
 
-function DayCard({ day: d, editMode, onUpdateDay, onDeleteDay, onWeekdayChange, requestConfirm, usedWeekdays, usedPhrases, setNodeRef, justMoved }) {
+function DayCard({ day: d, editMode, saveSignal, onUpdateDay, onDeleteDay, onWeekdayChange, requestConfirm, usedWeekdays, usedPhrases, setNodeRef, justMoved }) {
   const [collapsed, setCollapsed] = useState(false);
   const [addingName, setAddingName] = useState('');
   const [addingSets, setAddingSets] = useState('');
@@ -958,6 +966,7 @@ function DayCard({ day: d, editMode, onUpdateDay, onDeleteDay, onWeekdayChange, 
                 key={exercise.id}
                 exercise={exercise}
                 editMode={editMode}
+                saveSignal={saveSignal}
                 onUpdate={(u) => updateExercise(idx, u)}
                 onDelete={() => deleteExercise(idx)}
                 onToggleDone={() => toggleDone(idx)}
@@ -1445,6 +1454,7 @@ export default function GymRoutineApp() {
   const [needsTemplate, setNeedsTemplate] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
+  const [saveSignal, setSaveSignal] = useState(0);
   const undoStackRef = useRef([]);
   const prevDataRef = useRef(null);
   const isUndoingRef = useRef(false);
@@ -1722,7 +1732,7 @@ export default function GymRoutineApp() {
     }
   }
 
-  const requestConfirm = (message, action) => setConfirmState({ message, action });
+  const requestConfirm = (message, action, options = {}) => setConfirmState({ message, action, ...options });
   const closeConfirm = () => setConfirmState(null);
   const confirmAndRun = () => {
     if (confirmState) confirmState.action();
@@ -1947,9 +1957,22 @@ export default function GymRoutineApp() {
   };
 
   const handleSaveEdits = () => {
+    setSaveSignal((s) => s + 1);
     undoStackRef.current = [];
     setCanUndo(false);
     setEditMode(false);
+  };
+
+  const handleSaveClick = () => {
+    const hasOpenEdits = typeof document !== 'undefined' && document.querySelectorAll('.ex-row-editing').length > 0;
+    if (!canUndo && !hasOpenEdits) {
+      handleSaveEdits();
+      return;
+    }
+    const message = hasOpenEdits
+      ? 'Tenés un ejercicio sin confirmar (sin tildar). Si guardás ahora, ese cambio se va a aplicar igual. ¿Guardar todos los cambios?'
+      : '¿Guardar todos los cambios de esta edición?';
+    requestConfirm(message, handleSaveEdits, { confirmLabel: 'Guardar', variant: 'save' });
   };
 
   return (
@@ -2087,6 +2110,7 @@ export default function GymRoutineApp() {
                     key={d.id}
                     day={d}
                     editMode={editMode}
+                    saveSignal={saveSignal}
                     onUpdateDay={(u) => updateDay(d.id, u)}
                     onDeleteDay={() => deleteDay(d.id)}
                     onWeekdayChange={(wd) => setDayWeekday(d.id, wd)}
@@ -2168,7 +2192,7 @@ export default function GymRoutineApp() {
       {!editMode && <FloatingTimer raised={activeTab === 'chat'} />}
 
       {editMode && activeTab === 'routines' && (
-        <EditFloatingControls onSave={handleSaveEdits} onUndo={handleUndo} canUndo={canUndo} />
+        <EditFloatingControls onSave={handleSaveClick} onUndo={handleUndo} canUndo={canUndo} />
       )}
 
       <BottomNav activeTab={activeTab} onChange={setActiveTab} />
@@ -2705,7 +2729,7 @@ const styles = `
 }
 .ex-row:hover { background: #212226; }
 .ex-row:active { cursor: grabbing; }
-.ex-row-editing { background: #212226; grid-template-columns: 1fr auto auto auto auto; cursor: default; }
+.ex-row-editing { background: #212226; grid-template-columns: 1fr auto auto auto; cursor: default; }
 .ex-row-view { grid-template-columns: auto 1fr auto; cursor: default; }
 .ex-row-view:hover { background: transparent; }
 
@@ -2859,6 +2883,8 @@ const styles = `
 .confirm-btn.cancel:hover { background: #34353A; }
 .confirm-btn.danger { background: #B33A3A; color: #fff; }
 .confirm-btn.danger:hover { background: #C24747; }
+.confirm-btn.save { background: #6FAE7A; color: #17181B; }
+.confirm-btn.save:hover { background: #7FBD8A; }
 
 /* Cronómetro flotante */
 /* Burbujas flotantes de edición (guardar / deshacer) */
