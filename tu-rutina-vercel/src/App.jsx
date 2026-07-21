@@ -2727,7 +2727,7 @@ const styles = `
   transition: bottom 0.15s ease;
 }
 .timer-wrap-raised {
-  bottom: calc(150px + env(safe-area-inset-bottom));
+  bottom: calc(175px + env(safe-area-inset-bottom));
 }
 
 .timer-fab {
