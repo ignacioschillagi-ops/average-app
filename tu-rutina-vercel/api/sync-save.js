@@ -1,4 +1,6 @@
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
+
+const redis = Redis.fromEnv();
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -13,14 +15,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const exists = await kv.exists(`sync:${code}`);
+    const exists = await redis.exists(`sync:${code}`);
     if (!exists) {
       res.status(404).json({ error: 'Código no encontrado' });
       return;
     }
 
     const payload = { data: data || null, apiKey: apiKey || '', updatedAt: Date.now() };
-    await kv.set(`sync:${code}`, payload);
+    await redis.set(`sync:${code}`, payload);
 
     res.status(200).json({ ok: true, updatedAt: payload.updatedAt });
   } catch (err) {
