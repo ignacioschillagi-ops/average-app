@@ -656,11 +656,13 @@ function TemplatePicker({ onPick, onBack }) {
 
 function TemplateBrowserModal({ onPick, onClose }) {
   return (
-    <div className="help-overlay" onClick={onClose}>
-      <div className="template-browser-box" onClick={(e) => e.stopPropagation()}>
-        <button className="icon-btn help-close" onClick={onClose} aria-label="Cerrar"><X size={16} /></button>
+    <div className="template-browser-screen">
+      <button className="template-browser-close" onClick={onClose} aria-label="Cerrar">
+        <X size={20} />
+      </button>
+      <div className="picker-wrap">
         <div className="picker-header">
-          <Dumbbell size={24} strokeWidth={2.2} />
+          <Dumbbell size={26} strokeWidth={2.2} />
           <h1>Agregar una rutina nueva</h1>
           <p>Elegí una base clásica. Se suma a las que ya tenés, sin tocarlas.</p>
         </div>
@@ -2697,18 +2699,35 @@ const styles = `
 }
 .add-routine-link:hover { color: #EDEAE3; text-decoration: underline; }
 
-.template-browser-box {
-  position: relative;
-  background: #1C1D20;
-  border: 1px solid #2E2F33;
-  border-radius: 16px;
-  padding: 28px 26px 26px;
-  max-width: 760px;
-  width: 100%;
-  max-height: 85vh;
+.template-browser-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
   overflow-y: auto;
+  background: #17181B;
+  background-image:
+    radial-gradient(circle at 15% 0%, rgba(179,58,58,0.06), transparent 40%),
+    radial-gradient(circle at 85% 100%, rgba(78,122,140,0.06), transparent 40%);
+  padding: 28px 20px 60px;
 }
-.template-browser-box .picker-header { margin-bottom: 22px; }
+
+.template-browser-close {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 61;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid #2E2F33;
+  background: #1C1D20;
+  color: #EDEAE3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.template-browser-close:hover { border-color: #B33A3A; }
 
 .add-day-btn, .reset-week-btn {
   display: flex; align-items: center; gap: 8px; background: #1C1D20; border: 1px dashed #3A3B3F;
