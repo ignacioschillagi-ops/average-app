@@ -1,4 +1,6 @@
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
+
+const redis = Redis.fromEnv();
 
 // Mismos nombres que en el frontend (src/App.jsx -> SYNC_CODE_NAMES). Si agregás o sacás
 // nombres, mantené las dos listas iguales para que la explicación al usuario tenga sentido.
@@ -26,7 +28,7 @@ export default async function handler(req, res) {
     for (let i = 0; i < 25; i += 1) {
       const candidate = randomCode();
       // eslint-disable-next-line no-await-in-loop
-      const exists = await kv.exists(`sync:${candidate}`);
+      const exists = await redis.exists(`sync:${candidate}`);
       if (!exists) {
         code = candidate;
         break;
@@ -39,7 +41,7 @@ export default async function handler(req, res) {
     }
 
     const payload = { data: null, apiKey: '', updatedAt: Date.now() };
-    await kv.set(`sync:${code}`, payload);
+    await redis.set(`sync:${code}`, payload);
 
     res.status(200).json({ code });
   } catch (err) {
