@@ -738,6 +738,46 @@ function TemplateBrowserModal({ onPick, onClose }) {
   );
 }
 
+function PrivacyPolicyOverlay({ onClose }) {
+  return (
+    <div className="template-browser-screen">
+      <button className="template-browser-close" onClick={onClose} aria-label="Cerrar">
+        <X size={20} />
+      </button>
+      <div className="picker-wrap">
+        <div className="picker-header">
+          <Dumbbell size={26} strokeWidth={2.2} />
+          <h1>Política de privacidad</h1>
+        </div>
+        <div className="privacy-policy-text">
+          <p>
+            Tu perfil (nombre, altura, peso, años entrenando, objetivo, notas) y tus rutinas se
+            guardan en este dispositivo. Si generás un <strong>código de sincronización</strong>, esos
+            mismos datos también quedan en una base en la nube para que puedas verlos desde otro
+            dispositivo — ese código funciona como una contraseña: quien lo tenga puede ver y
+            editar tu información, y no hay forma de recuperarlo si lo perdés.
+          </p>
+          <p>
+            Si activás el chat con <strong>Joe's</strong>, tu propia API key de Groq se guarda igual que
+            el resto de tus datos, y se usa para hablar directo con la API de Groq — esas
+            conversaciones no pasan ni quedan guardadas en ningún otro lado nuestro.
+          </p>
+          <p>
+            Cuando le preguntás a Joe's por un ejercicio puntual, el nombre de ese ejercicio se
+            manda a la base pública de wger.de para buscar la info — no se envía ningún otro dato
+            tuyo en esas consultas.
+          </p>
+          <p>
+            No usamos cookies ni publicidad, y no compartimos ni vendemos nada de esto a
+            terceros. Si querés que borremos tus datos, escribinos por{' '}
+            <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer">Instagram</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------- Ayuda ----------
 
 function ProfileFaq() {
@@ -1541,6 +1581,7 @@ export default function GymRoutineApp() {
   const prevDataRef = useRef(null);
   const isUndoingRef = useRef(false);
   const [showTemplateBrowser, setShowTemplateBrowser] = useState(false);
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showVariantMenu, setShowVariantMenu] = useState(false);
   const [confirmState, setConfirmState] = useState(null);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -1895,7 +1936,12 @@ export default function GymRoutineApp() {
                 <ChevronDown size={16} className={`faq-chevron ${onboardingCodeFaqOpen ? 'open' : ''}`} />
               </button>
               {onboardingCodeFaqOpen && (
-                <div className="faq-answer"><p>{SYNC_CODE_EXPLAINER}</p></div>
+                <div className="faq-answer">
+                  <p>{SYNC_CODE_EXPLAINER}</p>
+                  <button className="privacy-link-btn" onClick={() => setShowPrivacyPolicy(true)}>
+                    Ver política de privacidad completa
+                  </button>
+                </div>
               )}
             </div>
 
@@ -1927,6 +1973,7 @@ export default function GymRoutineApp() {
             </button>
           </div>
           <BrandFooter />
+          {showPrivacyPolicy && <PrivacyPolicyOverlay onClose={() => setShowPrivacyPolicy(false)} />}
         </div>
       );
     }
@@ -2439,6 +2486,9 @@ export default function GymRoutineApp() {
               {profileCodeFaqOpen && (
                 <div className="faq-answer">
                   <p>{SYNC_CODE_EXPLAINER}</p>
+                  <button className="privacy-link-btn" onClick={() => setShowPrivacyPolicy(true)}>
+                    Ver política de privacidad completa
+                  </button>
                   {syncCode && (
                     <div className="sync-paste-row">
                       <span className="sync-paste-label">¿Ya tenés un código?</span>
@@ -2527,6 +2577,8 @@ export default function GymRoutineApp() {
           onPick={(t) => { addVariant(t); setShowTemplateBrowser(false); }}
         />
       )}
+
+      {showPrivacyPolicy && <PrivacyPolicyOverlay onClose={() => setShowPrivacyPolicy(false)} />}
 
       <ConfirmDialog state={confirmState} onCancel={closeConfirm} onConfirm={confirmAndRun} />
     </div>
@@ -2696,15 +2748,15 @@ const styles = `
 .icon-toggle-btn:hover { color: #EDEAE3; border-color: #4E7A8C; }
 
 /* Envoltorio de pestañas (para el swipe y la animación al cambiar de sección) */
-.tab-panel-slide-right { animation: tab-slide-in-right 220ms ease; }
-.tab-panel-slide-left { animation: tab-slide-in-left 220ms ease; }
+.tab-panel-slide-right { animation: tab-slide-in-right 320ms cubic-bezier(0.22, 1, 0.36, 1); }
+.tab-panel-slide-left { animation: tab-slide-in-left 320ms cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes tab-slide-in-right {
-  0% { opacity: 0; transform: translateX(16px); }
-  100% { opacity: 1; transform: translateX(0); }
+  0% { opacity: 0; transform: translateX(10px) scale(0.99); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
 }
 @keyframes tab-slide-in-left {
-  0% { opacity: 0; transform: translateX(-16px); }
-  100% { opacity: 1; transform: translateX(0); }
+  0% { opacity: 0; transform: translateX(-10px) scale(0.99); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
 }
 
 /* Preguntas frecuentes (dentro de Perfil) */
@@ -2744,6 +2796,31 @@ const styles = `
   font-size: 14px;
   color: #B33A3A !important;
 }
+
+.privacy-link-btn {
+  display: inline-block;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 2px;
+  color: #4E7A8C;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.privacy-link-btn:hover { color: #6FA8C4; }
+
+.privacy-policy-text { max-width: 640px; margin: 0 auto; }
+.privacy-policy-text p {
+  font-size: 14px;
+  color: #B0AFA9;
+  line-height: 1.7;
+  margin: 0 0 16px;
+}
+.privacy-policy-text p strong { color: #EDEAE3; }
+.privacy-policy-text p a { color: #4E7A8C; text-decoration: underline; }
+.privacy-policy-text p a:hover { color: #6FA8C4; }
 
 .variant-toggle {
   display: flex;
@@ -2909,14 +2986,14 @@ const styles = `
   gap: 16px;
 }
 
-.day-grid-slide-right { animation: slide-in-right 280ms ease; }
-.day-grid-slide-left { animation: slide-in-left 280ms ease; }
+.day-grid-slide-right { animation: slide-in-right 340ms cubic-bezier(0.22, 1, 0.36, 1); }
+.day-grid-slide-left { animation: slide-in-left 340ms cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes slide-in-right {
-  0% { opacity: 0; transform: translateX(28px); }
+  0% { opacity: 0; transform: translateX(14px); }
   100% { opacity: 1; transform: translateX(0); }
 }
 @keyframes slide-in-left {
-  0% { opacity: 0; transform: translateX(-28px); }
+  0% { opacity: 0; transform: translateX(-14px); }
   100% { opacity: 1; transform: translateX(0); }
 }
 
@@ -3137,17 +3214,17 @@ const styles = `
   margin: 14px auto 0;
   background: none;
   border: none;
-  color: #6B6A65;
+  color: #B33A3A;
   font-family: 'Oswald', sans-serif;
   font-weight: 600;
-  font-size: 12.5px;
+  font-size: 14.5px;
   letter-spacing: 0.02em;
   text-align: center;
   width: 100%;
   cursor: pointer;
-  padding: 6px;
+  padding: 8px;
 }
-.add-routine-link:hover { color: #EDEAE3; text-decoration: underline; }
+.add-routine-link:hover { color: #C24747; text-decoration: underline; }
 
 .template-browser-screen {
   position: fixed;
