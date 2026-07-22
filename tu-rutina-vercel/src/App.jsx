@@ -443,6 +443,7 @@ const storage = {
 const API_KEY_STORAGE = 'groq-api-key-v1';
 const CHAT_STORAGE = 'joes-chat-v1';
 const SYNC_CODE_STORAGE = 'sync-code-v1';
+const TIMER_PRESET_STORAGE = 'timer-last-preset-v1';
 
 // Modelo de Groq usado por el chat. Si Groq lo discontinúa, alcanza con cambiar esta constante.
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -1152,8 +1153,31 @@ function FloatingTimer({ raised }) {
   const [remaining, setRemaining] = useState(60);
   const [running, setRunning] = useState(false);
   const [justFinished, setJustFinished] = useState(false);
+  const [lastPreset, setLastPreset] = useState(60);
+  const [lastPresetLoaded, setLastPresetLoaded] = useState(false);
   const intervalRef = useRef(null);
   const audioCtxRef = useRef(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await storage.get(TIMER_PRESET_STORAGE);
+        const stored = result && result.value ? parseInt(result.value, 10) : null;
+        if (stored && TIMER_PRESETS.includes(stored)) {
+          setLastPreset(stored);
+          setRemaining(stored);
+        }
+      } catch (e) {
+        // sin preferencia guardada todavía
+      }
+      setLastPresetLoaded(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!lastPresetLoaded) return;
+    storage.set(TIMER_PRESET_STORAGE, String(lastPreset)).catch(() => {});
+  }, [lastPreset, lastPresetLoaded]);
 
   useEffect(() => {
     if (!running) return undefined;
@@ -1195,15 +1219,15 @@ function FloatingTimer({ raised }) {
     }
   };
 
-  const setPreset = (s) => { setRunning(false); setRemaining(s); };
+  const setPreset = (s) => { setRunning(false); setRemaining(s); setLastPreset(s); };
   const adjust = (delta) => setRemaining((r) => Math.max(0, r + delta));
   const toggleRun = () => {
-    if (!running && remaining <= 0) setRemaining(60);
+    if (!running && remaining <= 0) setRemaining(lastPreset);
     setRunning((r) => !r);
   };
-  const resetTimer = () => { setRunning(false); setRemaining(60); };
+  const resetTimer = () => { setRunning(false); setRemaining(lastPreset); };
 
-  const isDefault = remaining === 60 && !running;
+  const isDefault = remaining === lastPreset && !running;
 
   return (
     <div className={`timer-wrap ${raised ? 'timer-wrap-raised' : ''}`}>
@@ -1220,8 +1244,9 @@ function FloatingTimer({ raised }) {
               {TIMER_PRESETS.map((s) => (
                 <button
                   key={s}
-                  className={`timer-preset-btn ${remaining === s && !running ? 'active' : ''}`}
+                  className={`timer-preset-btn ${remaining === s && !running ? 'active' : ''} ${s === lastPreset ? 'is-last-used' : ''}`}
                   onClick={() => setPreset(s)}
+                  title={s === lastPreset ? 'Este es el tiempo que se usa al darle Play' : undefined}
                 >
                   {s}s
                 </button>
@@ -3291,6 +3316,7 @@ const styles = `
 }
 .timer-preset-btn:hover { border-color: #B33A3A; }
 .timer-preset-btn.active { background: #B33A3A; border-color: #B33A3A; color: #fff; }
+.timer-preset-btn.is-last-used { box-shadow: 0 0 0 2px #B33A3A inset; }
 
 .timer-controls {
   display: grid;
