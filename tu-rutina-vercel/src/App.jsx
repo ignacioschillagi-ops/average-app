@@ -1320,7 +1320,7 @@ function ProfileForm({ profile, onFieldChange }) {
         <span>Algo más que debería saber (lesiones, preferencias, restricciones)</span>
         <textarea
           value={profile.notes} onChange={(e) => onFieldChange('notes', e.target.value)}
-          placeholder="Opcional" rows={2}
+          placeholder="Opcional" rows={4}
         />
       </label>
     </div>
@@ -3531,6 +3531,7 @@ const styles = `
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-width: 0;
 }
 .profile-field span {
   font-family: 'JetBrains Mono', monospace;
@@ -3539,6 +3540,9 @@ const styles = `
   letter-spacing: 0.02em;
 }
 .profile-field input, .profile-field select, .profile-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
   background: #1C1D20;
   border: 1px solid #2E2F33;
   color: #EDEAE3;
@@ -3551,6 +3555,7 @@ const styles = `
 .profile-field input:focus, .profile-field select:focus, .profile-field textarea:focus { border-color: #B33A3A; }
 .profile-field textarea { resize: vertical; }
 .profile-field-wide { grid-column: 1 / -1; }
+.profile-form { min-width: 0; }
 
 /* Código de sincronización — pestaña Perfil */
 .sync-code-section {
@@ -3581,10 +3586,10 @@ const styles = `
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #1C1D20;
-  border: 1px solid #2E2F33;
+  background: rgba(78,122,140,0.12);
+  border: 1.5px solid #4E7A8C;
   border-radius: 10px;
-  padding: 12px 16px;
+  padding: 14px 18px;
   margin-bottom: 6px;
 }
 .sync-code-label {
@@ -3596,10 +3601,10 @@ const styles = `
 }
 .sync-code-value {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 16px;
+  font-size: 21px;
   font-weight: 700;
-  color: #4E7A8C;
-  letter-spacing: 0.02em;
+  color: #6FA8C4;
+  letter-spacing: 0.03em;
 }
 
 .sync-code-error {
