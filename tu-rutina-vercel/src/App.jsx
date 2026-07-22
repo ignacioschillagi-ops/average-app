@@ -1208,7 +1208,7 @@ function FloatingTimer({ raised }) {
       osc.type = 'sine';
       osc.frequency.value = 880;
       gain.gain.setValueAtTime(0.001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.65, ctx.currentTime + 0.01);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
       osc.connect(gain);
       gain.connect(ctx.destination);
@@ -1320,7 +1320,7 @@ function ProfileForm({ profile, onFieldChange }) {
         <span>Algo más que debería saber (lesiones, preferencias, restricciones)</span>
         <textarea
           value={profile.notes} onChange={(e) => onFieldChange('notes', e.target.value)}
-          placeholder="Opcional" rows={3}
+          placeholder="Opcional" rows={2}
         />
       </label>
     </div>
@@ -2096,14 +2096,15 @@ export default function GymRoutineApp() {
     onDrop: handleVariantDrop,
   });
 
-  const shiftTab = (direction) => {
-    const idx = TAB_ORDER.indexOf(activeTab);
-    const nextIdx = (idx + direction + TAB_ORDER.length) % TAB_ORDER.length;
-    setActiveTab(TAB_ORDER[nextIdx]);
+  const shiftVariant = (direction) => {
+    const idx = data.variants.findIndex((v) => v.id === data.activeVariant);
+    if (idx === -1) return;
+    const nextIdx = (idx + direction + data.variants.length) % data.variants.length;
+    setVariant(data.variants[nextIdx].id);
   };
 
   const handleTouchStart = (e) => {
-    if (e.target.closest('.drag-handle') || e.target.closest('.variant-drag-handle')) {
+    if (e.target.closest('.drag-handle')) {
       touchStartX.current = null;
       return;
     }
@@ -2113,8 +2114,8 @@ export default function GymRoutineApp() {
     if (touchStartX.current === null) return;
     const deltaX = e.changedTouches[0].clientX - touchStartX.current;
     touchStartX.current = null;
-    if (Math.abs(deltaX) < 100) return;
-    shiftTab(deltaX < 0 ? 1 : -1);
+    if (Math.abs(deltaX) < 100 || data.variants.length < 2) return;
+    shiftVariant(deltaX < 0 ? 1 : -1);
   };
 
   const saveTitle = () => {
@@ -2244,8 +2245,6 @@ export default function GymRoutineApp() {
       <div
         key={activeTab}
         className={`tab-panel tab-panel-slide-${tabSlideDir}`}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
       >
       {activeTab === 'routines' && (
         <>
@@ -2366,6 +2365,8 @@ export default function GymRoutineApp() {
               <main
                 key={transitionKey}
                 className={`day-grid day-grid-slide-${slideDir}`}
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
               >
                 {sortedDays.map((d) => (
                   <DayCard
@@ -2436,25 +2437,46 @@ export default function GymRoutineApp() {
                 <ChevronDown size={16} className={`faq-chevron ${profileCodeFaqOpen ? 'open' : ''}`} />
               </button>
               {profileCodeFaqOpen && (
-                <div className="faq-answer"><p>{SYNC_CODE_EXPLAINER}</p></div>
+                <div className="faq-answer">
+                  <p>{SYNC_CODE_EXPLAINER}</p>
+                  {syncCode && (
+                    <div className="sync-paste-row">
+                      <span className="sync-paste-label">¿Ya tenés un código?</span>
+                      <div className="sync-paste-inputs">
+                        <input
+                          className="sync-paste-input"
+                          value={profilePasteInput}
+                          onChange={(e) => setProfilePasteInput(e.target.value)}
+                          placeholder="Ej: Tigre57"
+                        />
+                        <button className="sync-paste-btn" onClick={handleProfilePasteClick} disabled={syncStatus === 'syncing' || !profilePasteInput.trim()}>
+                          Usar
+                        </button>
+                      </div>
+                      {syncError && <p className="sync-code-error">{syncError}</p>}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
-            <div className="sync-paste-row">
-              <span className="sync-paste-label">¿Ya tenés un código?</span>
-              <div className="sync-paste-inputs">
-                <input
-                  className="sync-paste-input"
-                  value={profilePasteInput}
-                  onChange={(e) => setProfilePasteInput(e.target.value)}
-                  placeholder="Ej: Tigre57"
-                />
-                <button className="sync-paste-btn" onClick={handleProfilePasteClick} disabled={syncStatus === 'syncing' || !profilePasteInput.trim()}>
-                  Usar
-                </button>
+            {!syncCode && (
+              <div className="sync-paste-row">
+                <span className="sync-paste-label">¿Ya tenés un código?</span>
+                <div className="sync-paste-inputs">
+                  <input
+                    className="sync-paste-input"
+                    value={profilePasteInput}
+                    onChange={(e) => setProfilePasteInput(e.target.value)}
+                    placeholder="Ej: Tigre57"
+                  />
+                  <button className="sync-paste-btn" onClick={handleProfilePasteClick} disabled={syncStatus === 'syncing' || !profilePasteInput.trim()}>
+                    Usar
+                  </button>
+                </div>
+                {syncError && <p className="sync-code-error">{syncError}</p>}
               </div>
-              {syncError && <p className="sync-code-error">{syncError}</p>}
-            </div>
+            )}
           </div>
 
           <ProfileFaq />
@@ -3503,12 +3525,12 @@ const styles = `
 .profile-form {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 10px 12px;
 }
 .profile-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 3px;
 }
 .profile-field span {
   font-family: 'JetBrains Mono', monospace;
@@ -3521,7 +3543,7 @@ const styles = `
   border: 1px solid #2E2F33;
   color: #EDEAE3;
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   font-size: 14px;
   font-family: 'Inter', sans-serif;
   outline: none;
@@ -3532,8 +3554,8 @@ const styles = `
 
 /* Código de sincronización — pestaña Perfil */
 .sync-code-section {
-  margin-top: 28px;
-  padding-top: 20px;
+  margin-top: 18px;
+  padding-top: 16px;
   border-top: 1px solid #2A2B2F;
 }
 
@@ -4024,6 +4046,5 @@ const styles = `
 
 @media (max-width: 640px) {
   .day-grid { grid-template-columns: 1fr; }
-  .profile-form { grid-template-columns: 1fr; }
 }
 `;
