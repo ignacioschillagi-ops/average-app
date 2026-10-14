@@ -10,11 +10,33 @@ Proyecto Vite + React listo para deployar en Vercel.
   está el código de sincronización (ver más abajo).
 - **Favicon y título**: ahora se definen en `index.html` (`public/favicon.svg`), no con el
   efecto dinámico que usaba el artifact.
-- **Entrenador con IA (Joe's)**: llama directo desde el navegador a la API de Groq
-  (`https://api.groq.com/openai/v1/chat/completions`) usando la API key que cada persona pega
-  en la pestaña "Joe's". La key se guarda en `localStorage`, nunca pasa por ningún servidor
-  propio. Si Groq llega a cambiar o discontinuar el modelo `llama-3.3-70b-versatile`, se
-  actualiza en la constante `GROQ_MODEL` al principio de `src/App.jsx`.
+- **Entrenador con IA (Joe's)**: funciona con una API key gratuita de **Groq** o de
+  **Google Gemini**, la que cada persona prefiera pegar en la pestaña "Joe's". La app
+  reconoce sola de cuál es por cómo empieza (`gsk_` = Groq, `AIza` = Gemini) y llama directo
+  desde el navegador a ese servicio. La key se guarda en `localStorage` (y en el código de
+  sincronización si se usa), nunca pasa por ningún servidor propio.
+  **El modelo se elige solo**, para no tener que tocar código cada vez que estos servicios
+  retiran modelos (como hizo Groq el 16/08/2026 con `llama-3.3-70b-versatile`, que fue lo
+  que rompió el chat):
+  - Groq usa `openai/gpt-oss-120b` y después `openai/gpt-oss-20b` (`GROQ_PREFERRED_MODELS`).
+  - Gemini usa los alias `gemini-flash-lite-latest` y después `gemini-flash-latest`
+    (`GEMINI_PREFERRED_MODELS`), que Google apunta solo a la versión más nueva.
+  - Si el servicio dice que el modelo ya no existe, la app le pide la lista de modelos
+    activos, elige el mejor, lo recuerda 7 días y reintenta sola. Si dice que se llegó al
+    límite gratis de un modelo, prueba con el otro de la lista.
+  - Si querés forzar un modelo puntual, ponelo primero en la lista correspondiente al
+    principio de `src/App.jsx`.
+- **Historial de entrenamientos**: cuando alguien tilda al menos la mitad de los ejercicios
+  de un día (`MIN_DONE_RATIO` en `src/App.jsx`), se guarda un registro en `data.history` con
+  la fecha, el día (ej. "FUERZA"), la rutina a la que pertenece, cuántos ejercicios hizo
+  (ej. "4 de 6", cuáles sí y cuáles no) y el tiempo desde la primera casilla hasta la última.
+  Si sigue tildando, el mismo registro se actualiza. Se ve en un calendario mensual que se
+  abre desde la tarjeta "Historial de entrenamientos" arriba de todo en Perfil. Viaja con el
+  resto de los datos, así que también se sincroniza con el código.
+  Detalles: si desmarca casillas y baja de la mitad durante el mismo entrenamiento, el
+  registro se quita (por si fue sin querer), pero desmarcar días después no borra nada viejo;
+  si pasan más de 12 h desde que arrancó, lo que tilde cuenta como un entrenamiento nuevo; y
+  duraciones de más de 5 h no se muestran porque seguramente fueron días distintos.
 - **Funciona sin internet (menos el chat)**: agregué `vite-plugin-pwa`, que genera un
   service worker (`vite.config.js`). Una vez que se abrió la app con conexión al menos una
   vez (o se instaló en el celu), el resto de las veces carga y funciona sin internet: ver y
