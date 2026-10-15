@@ -71,18 +71,8 @@ const fitText = (ctx, text, maxWidth) => {
   return `${t}…`;
 };
 
-/**
- * opts: { logoSrc, headline, tag, subtitle, date, stats: [{ value, label }],
- *         exercises: [{ name, done, detail }], phrase, handle, footer }
- */
-export const drawStoryCard = async (opts) => {
-  await ensureFonts();
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d');
-
-  // Fondo con los mismos brillos suaves que la app.
+// Fondo con los mismos brillos suaves que la app.
+const paintBackground = (ctx) => {
   ctx.fillStyle = COLORS.bg;
   ctx.fillRect(0, 0, W, H);
   let g = ctx.createRadialGradient(160, 0, 0, 160, 0, 900);
@@ -95,6 +85,69 @@ export const drawStoryCard = async (opts) => {
   g.addColorStop(1, 'rgba(78,122,140,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
+};
+
+const drawStats = (ctx, stats, y, boxH = 200) => {
+  const list = (stats || []).slice(0, 3);
+  if (!list.length) return y;
+  const gap = 28;
+  const bw = (W - 160 - gap * (list.length - 1)) / list.length;
+  ctx.textAlign = 'center';
+  list.forEach((st, i) => {
+    const x = 80 + i * (bw + gap);
+    roundRect(ctx, x, y, bw, boxH, 28);
+    ctx.fillStyle = 'rgba(28,29,32,0.92)';
+    ctx.fill();
+    ctx.strokeStyle = COLORS.line;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = COLORS.ink;
+    // El número se achica (hasta un 60 %) antes de cortarse, para que "1 h 05 min" entre entero.
+    let size = Math.round(boxH * 0.33);
+    const minSize = Math.round(size * 0.6);
+    ctx.font = `600 ${size}px Oswald, Impact, sans-serif`;
+    while (size > minSize && ctx.measureText(String(st.value)).width > bw - 30) {
+      size -= 2;
+      ctx.font = `600 ${size}px Oswald, Impact, sans-serif`;
+    }
+    ctx.fillText(fitText(ctx, st.value, bw - 30), x + bw / 2, y + boxH * 0.5);
+    ctx.fillStyle = COLORS.muted;
+    ctx.font = `500 ${Math.round(boxH * 0.16)}px Inter, Helvetica, sans-serif`;
+    ctx.fillText(fitText(ctx, st.label, bw - 30), x + bw / 2, y + boxH * 0.79);
+  });
+  return y + boxH;
+};
+
+const drawFooter = (ctx, opts) => {
+  ctx.textAlign = 'center';
+  ctx.fillStyle = COLORS.red;
+  ctx.font = '600 56px Oswald, Impact, sans-serif';
+  ctx.fillText(opts.handle || '@YoSoyJoe', W / 2, H - 170);
+  ctx.fillStyle = COLORS.muted;
+  ctx.font = '500 34px Inter, Helvetica, sans-serif';
+  if (opts.footer) ctx.fillText(fitText(ctx, opts.footer, W - 160), W / 2, H - 110);
+};
+
+const toBlob = (canvas) => new Promise((resolve, reject) => {
+  try {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('blob'))), 'image/png');
+  } catch (e) {
+    reject(e);
+  }
+});
+
+/**
+ * opts: { logoSrc, headline, tag, subtitle, date, stats: [{ value, label }],
+ *         exercises: [{ name, done, detail }], phrase, handle, footer }
+ */
+export const drawStoryCard = async (opts) => {
+  await ensureFonts();
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  paintBackground(ctx);
 
   let y = 150;
   const logo = opts.logoSrc ? await loadImage(opts.logoSrc) : null;
@@ -139,27 +192,7 @@ export const drawStoryCard = async (opts) => {
   y += 40;
 
   // Estadísticas
-  const stats = (opts.stats || []).slice(0, 3);
-  if (stats.length) {
-    const gap = 28;
-    const bw = (W - 160 - gap * (stats.length - 1)) / stats.length;
-    stats.forEach((s, i) => {
-      const x = 80 + i * (bw + gap);
-      roundRect(ctx, x, y, bw, 200, 28);
-      ctx.fillStyle = 'rgba(28,29,32,0.92)';
-      ctx.fill();
-      ctx.strokeStyle = COLORS.line;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.fillStyle = COLORS.ink;
-      ctx.font = '600 66px Oswald, Impact, sans-serif';
-      ctx.fillText(fitText(ctx, s.value, bw - 30), x + bw / 2, y + 100);
-      ctx.fillStyle = COLORS.muted;
-      ctx.font = '500 32px Inter, Helvetica, sans-serif';
-      ctx.fillText(fitText(ctx, s.label, bw - 30), x + bw / 2, y + 158);
-    });
-    y += 250;
-  }
+  if ((opts.stats || []).length) y = drawStats(ctx, opts.stats, y) + 50;
 
   // La frase va anclada arriba del pie; los ejercicios ocupan el espacio que queda.
   const footerTop = H - 250;
@@ -202,20 +235,126 @@ export const drawStoryCard = async (opts) => {
     phraseLines.forEach((l) => { ctx.fillText(l, W / 2, py + 46); py += 62; });
   }
 
-  // Pie
-  ctx.textAlign = 'center';
-  ctx.fillStyle = COLORS.red;
-  ctx.font = '600 56px Oswald, Impact, sans-serif';
-  ctx.fillText(opts.handle || '@YoSoyJoe', W / 2, H - 170);
-  ctx.fillStyle = COLORS.muted;
-  ctx.font = '500 34px Inter, Helvetica, sans-serif';
-  if (opts.footer) ctx.fillText(fitText(ctx, opts.footer, W - 160), W / 2, H - 110);
+  drawFooter(ctx, opts);
 
-  return new Promise((resolve, reject) => {
-    try {
-      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('blob'))), 'image/png');
-    } catch (e) {
-      reject(e);
-    }
+  return toBlob(canvas);
+};
+
+/**
+ * Plantilla "Detalle": sin frase ni nombre de rutina; enumera todos los ejercicios hechos con
+ * sus series y pesos (o el objetivo, si no se anotaron series). Achica la letra para que entren.
+ * opts: { logoSrc, headline, subtitle, stats, exercises: [{ name, detail, muted }], handle, footer }
+ */
+export const drawDetailCard = async (opts) => {
+  await ensureFonts();
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  paintBackground(ctx);
+
+  let y = 110;
+  const logo = opts.logoSrc ? await loadImage(opts.logoSrc) : null;
+  if (logo) {
+    const lw = 250;
+    const lh = (logo.height / logo.width) * lw || 178;
+    ctx.drawImage(logo, (W - lw) / 2, y, lw, lh);
+    y += lh + 40;
+  } else {
+    y += 60;
+  }
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = COLORS.ink;
+  ctx.font = '700 92px Oswald, Impact, sans-serif';
+  wrapLines(ctx, String(opts.headline || '').toUpperCase(), W - 140, 2).forEach((l) => {
+    ctx.fillText(l, W / 2, y + 80);
+    y += 100;
   });
+  ctx.font = '500 38px Inter, Helvetica, sans-serif';
+  ctx.fillStyle = COLORS.muted;
+  if (opts.subtitle) { ctx.fillText(fitText(ctx, opts.subtitle, W - 160), W / 2, y + 44); y += 66; }
+  y += 34;
+  if ((opts.stats || []).length) y = drawStats(ctx, opts.stats, y, 170) + 44;
+
+  // Línea divisoria
+  ctx.strokeStyle = COLORS.line;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(100, y);
+  ctx.lineTo(W - 100, y);
+  ctx.stroke();
+  y += 36;
+
+  const footerTop = H - 250;
+  const listTop = y;
+  const listH = footerTop - listTop;
+  const textX = 168;
+  const maxW = W - textX - 100;
+  const all = opts.exercises || [];
+
+  // Busca la escala más grande en la que entra todo.
+  const layoutAt = (s) => {
+    const nameSize = Math.round(46 * s);
+    const detailSize = Math.round(36 * s);
+    const gap = Math.round(30 * s);
+    const items = all.map((e) => {
+      ctx.font = `600 ${nameSize}px Inter, Helvetica, sans-serif`;
+      const nameLines = wrapLines(ctx, e.name, maxW, 2);
+      ctx.font = `500 ${detailSize}px Inter, Helvetica, sans-serif`;
+      const detailLines = e.detail ? wrapLines(ctx, e.detail, maxW, 3) : [];
+      const h = nameLines.length * nameSize * 1.22 + detailLines.length * detailSize * 1.3 + (detailLines.length ? 6 : 0);
+      return { e, nameLines, detailLines, h };
+    });
+    const total = items.reduce((acc, it) => acc + it.h, 0) + gap * Math.max(0, items.length - 1);
+    return { s, nameSize, detailSize, gap, items, total };
+  };
+  // Con pocos ejercicios la letra crece un poco para llenar la tarjeta.
+  let layout = layoutAt(1.2);
+  for (let s = 1.15; layout.total > listH && s >= 0.5; s -= 0.05) layout = layoutAt(s);
+
+  // Si ni así entra, se muestran los que entran y "+N".
+  let items = layout.items;
+  let hidden = 0;
+  if (layout.total > listH) {
+    let acc = 0;
+    const room = listH - layout.detailSize * 1.6;
+    const kept = [];
+    for (const it of items) {
+      if (acc + it.h > room) break;
+      kept.push(it);
+      acc += it.h + layout.gap;
+    }
+    hidden = items.length - kept.length;
+    items = kept;
+  }
+  const used = items.reduce((acc, it) => acc + it.h, 0) + layout.gap * Math.max(0, items.length - 1);
+  // Si sobra lugar, la lista queda un poco más abajo (centrada en el espacio libre, sin pasarse).
+  let ly = listTop + Math.max(0, Math.min(140, (listH - used) / 3));
+
+  ctx.textAlign = 'left';
+  items.forEach((it) => {
+    const { nameSize, detailSize } = layout;
+    ctx.font = `700 ${nameSize}px Inter, Helvetica, sans-serif`;
+    ctx.fillStyle = COLORS.green;
+    ctx.fillText('✓', 100, ly + nameSize);
+    ctx.font = `600 ${nameSize}px Inter, Helvetica, sans-serif`;
+    ctx.fillStyle = COLORS.ink;
+    it.nameLines.forEach((l) => { ctx.fillText(l, textX, ly + nameSize); ly += nameSize * 1.22; });
+    if (it.detailLines.length) {
+      ly += 6;
+      ctx.font = `500 ${detailSize}px Inter, Helvetica, sans-serif`;
+      ctx.fillStyle = it.e.muted ? COLORS.muted : COLORS.ink2;
+      it.detailLines.forEach((l) => { ctx.fillText(l, textX, ly + detailSize); ly += detailSize * 1.3; });
+    }
+    ly += layout.gap;
+  });
+  if (hidden > 0) {
+    ctx.fillStyle = COLORS.muted;
+    ctx.font = `500 ${layout.detailSize}px Inter, Helvetica, sans-serif`;
+    ctx.fillText(`+${hidden}`, textX, ly + layout.detailSize);
+  }
+
+  drawFooter(ctx, opts);
+  return toBlob(canvas);
 };

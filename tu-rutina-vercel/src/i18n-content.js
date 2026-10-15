@@ -465,7 +465,7 @@ export const translateRoutineData = (data, lang) => {
       variantName: translateVariantName(h.variantName, lang),
       exercises: (h.exercises || []).map((e) => (typeof e === 'string'
         ? translateExerciseName(e, lang)
-        : { ...e, name: translateExerciseName(e.name, lang) })),
+        : { ...e, name: translateExerciseName(e.name, lang), ...(e.target ? { target: translateSets(e.target, lang) } : {}) })),
     })),
   };
 };

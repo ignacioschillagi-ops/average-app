@@ -80,7 +80,11 @@ Proyecto Vite + React listo para deployar en Vercel.
     (`#rutina=...`, `src/lib/share.js`), no usa servidor. Al abrirlo se ofrece cargarla,
     traducida al idioma de quien la abre.
   - Tarjeta para historias de Instagram al completar un día o desde el historial
-    (1080×1920, `src/lib/storyCard.js`), con logo, frase de Joe's y @YoSoyJoe.
+    (1080×1920, `src/lib/storyCard.js`). Al tocar compartir se elige entre dos plantillas
+    (`src/components/StoryPicker.jsx`; la app recuerda la última elegida):
+    **Con frase** (rutina, resumen y frase de Joe's) y **Detalle** (sin frase ni nombre de
+    rutina: todos los ejercicios hechos con sus series y pesos, o el objetivo si no se
+    anotaron series; la letra se achica sola para que entren).
   - **La rutina del mes de Joe**: se edita a mano en `public/rutina-del-mes.json` (adentro
     tiene las instrucciones). Aparece primera al elegir plantilla mientras `month` coincida
     con el mes actual; si no coincide, no se muestra.
@@ -88,6 +92,14 @@ Proyecto Vite + React listo para deployar en Vercel.
   solo si fue o no esta semana (puntos, objetivo, semanas seguidas). Nada de feed ni likes.
   Necesita el código de sincronización y la misma base de datos (ver abajo):
   `api/buddy-publish.js` y `api/buddy-get.js`. Dejar de compartir borra el resumen.
+- **Joe's te escribe si dejás de entrenar**: si pasan 5 días sin anotar ningún
+  entrenamiento (o 5 días desde que armaste la rutina sin estrenarla), Joe's deja un mensaje
+  en el chat preguntando si está todo bien, con lo que te toca hoy o lo próximo de tu rutina,
+  y aparece un punto rojo en "Joe's" en la barra de abajo hasta que abrís el chat. Es un
+  mensaje armado por la app (no usa la IA, así que llega sin API key ni internet) y hay uno
+  por cada racha sin entrenar. Se cambia en `src/lib/coach.js` (`COACH_NUDGE_DAYS`) y los
+  textos en `src/i18n-features.js` (`nudge1`…`nudgeFirst`). Aparece cuando abrís la app:
+  una notificación con la app cerrada necesitaría un servidor de notificaciones push.
 - **Funciona sin internet (menos el chat)**: agregué `vite-plugin-pwa`, que genera un
   service worker (`vite.config.js`). Una vez que se abrió la app con conexión al menos una
   vez (o se instaló en el celu), el resto de las veces carga y funciona sin internet: ver y
@@ -197,10 +209,12 @@ vercel
     │   ├── ExerciseSheet.jsx    # hoja del ejercicio: series, progreso, técnica, cambiar
     │   ├── ProgressChart.jsx    # gráfico de un ejercicio
     │   ├── ProgressTab.jsx      # pestaña Progreso: semana, historial, récords, compañeros
+    │   ├── StoryPicker.jsx      # elegir la plantilla de tarjeta para historias
     │   └── HistoryCalendar.jsx  # calendario del historial
     ├── data/
     │   └── alternatives.js      # alternativas por patrón de movimiento y equipo
     └── lib/
+        ├── coach.js      # mensaje de Joe's después de 5 días sin entrenar
         ├── dates.js      # fechas y semanas
         ├── lifts.js      # series, la vez pasada, récords, 1RM estimado
         ├── weekly.js     # objetivo semanal y semanas seguidas

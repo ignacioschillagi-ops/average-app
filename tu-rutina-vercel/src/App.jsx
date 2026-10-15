@@ -20,16 +20,18 @@ import { buildSystemPrompt } from './joe-prompt';
 import { searchWgerExercise, wgerSearchUrl } from './lib/wger';
 import { TIMER_PRESETS, restTimer, useRestTimer, formatTime } from './lib/restTimer';
 import {
-  currentLog, doneSetsOf, lastSession, trackLifts, formatSet,
+  currentLog, doneSetsOf, lastSession, trackLifts, formatSet, parseNumber, formatKg,
 } from './lib/lifts';
 import { weeklyGoalOf, weeklyStats } from './lib/weekly';
 import { weekKeyOf } from './lib/dates';
 import {
   routineShareUrl, readSharedRoutineFromUrl, clearSharedRoutineFromUrl, shareTextAndLink, shareImage,
 } from './lib/share';
-import { drawStoryCard } from './lib/storyCard';
+import { drawStoryCard, drawDetailCard } from './lib/storyCard';
+import StoryPicker from './components/StoryPicker';
+import { coachNudgeFor } from './lib/coach';
 import ExerciseSheet from './components/ExerciseSheet';
-import ProgressTab, { WeekDots } from './components/ProgressTab';
+import ProgressTab from './components/ProgressTab';
 import { entryExercises } from './components/HistoryCalendar';
 import {
   localDateKey, workoutDurationMs, formatDuration, monthName, formatLongDate, daysAgoLabel,
@@ -454,7 +456,7 @@ const TEMPLATES = [
 // guarda un registro en data.history (viaja con el resto de los datos, así que también se
 // sincroniza con el código). Si después sigue marcando, el mismo registro se actualiza:
 //   { id, date: 'AAAA-MM-DD', startedAt, completedAt, variantId, variantName, color,
-//     dayId, weekday, label, doneCount, totalCount, exercises: [{ name, done }] }
+//     dayId, weekday, label, doneCount, totalCount, exercises: [{ name, done, target, sets }] }
 // startedAt es cuándo se marcó la primera casilla de esa sesión y completedAt la última.
 // Cada ejercicio guarda además doneAt (cuándo se tildó) para saber qué se hizo en cada sesión.
 // Si entre una casilla y la siguiente pasan más de 12 h, se toma como un entrenamiento nuevo.
@@ -516,7 +518,8 @@ const trackWorkoutProgress = (history, variant, before, after, now = Date.now())
     const doneIds = new Set(sessionDone.map((e) => e.id));
     const exercises = list.map((e) => {
       const sets = doneIds.has(e.id) ? doneSetsOf(e, now).map((x) => ({ kg: x.kg, reps: x.reps })) : [];
-      return sets.length ? { name: e.name, done: doneIds.has(e.id), sets } : { name: e.name, done: doneIds.has(e.id) };
+      const base = { name: e.name, done: doneIds.has(e.id), ...(e.sets ? { target: e.sets } : {}) };
+      return sets.length ? { ...base, sets } : base;
     });
     const changed = !existing || existing.doneCount !== sessionDone.length || existing.totalCount !== total
       || JSON.stringify(existing.exercises) !== JSON.stringify(exercises);
@@ -615,6 +618,7 @@ const storage = {
 
 const API_KEY_STORAGE = 'groq-api-key-v1';
 const CHAT_STORAGE = 'joes-chat-v1';
+const NUDGE_STORAGE = 'joes-nudge-v1';
 const SYNC_CODE_STORAGE = 'sync-code-v1';
 
 // ---------- IA de Joe's (Groq o Google Gemini) ----------
@@ -1853,10 +1857,18 @@ function ApiKeySetup({ onActivate, onSkip, onRemove, initialKey }) {
 
 // ---------- Menú inferior ----------
 
-function BottomNav({ activeTab, onChange }) {
-  const item = (id, icon, label) => (
-    <button className={`bottom-nav-item ${activeTab === id ? 'active' : ''}`} onClick={() => onChange(id)} aria-current={activeTab === id ? 'page' : undefined}>
-      {icon}
+function BottomNav({ activeTab, onChange, chatUnread }) {
+  const item = (id, icon, label, badge) => (
+    <button
+      className={`bottom-nav-item ${activeTab === id ? 'active' : ''}`}
+      onClick={() => onChange(id)}
+      aria-current={activeTab === id ? 'page' : undefined}
+      aria-label={badge ? `${label}. ${tr('chatUnread')}` : undefined}
+    >
+      <span className="bottom-nav-icon">
+        {icon}
+        {badge && <span className="bottom-nav-dot" aria-hidden="true" />}
+      </span>
       <span>{label}</span>
     </button>
   );
@@ -1864,7 +1876,7 @@ function BottomNav({ activeTab, onChange }) {
     <nav className="bottom-nav">
       {item('routines', <Dumbbell size={20} />, tr('navRoutine'))}
       {item('progress', <TrendingUp size={20} />, tr('navProgress'))}
-      {item('chat', <img src={FAVICON_DATA_URI} alt="" className="bottom-nav-avatar" />, "Joe's")}
+      {item('chat', <img src={FAVICON_DATA_URI} alt="" className="bottom-nav-avatar" />, "Joe's", chatUnread)}
       {item('profile', <User size={20} />, tr('navProfile'))}
     </nav>
   );
@@ -2110,6 +2122,7 @@ export default function GymRoutineApp() {
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [openEx, setOpenEx] = useState(null); // { dayId, exId }
   const [toast, setToast] = useState(null);
+  const [storyPicker, setStoryPicker] = useState(null);
   const toastTimerRef = useRef(null);
   const [sharedRoutine, setSharedRoutine] = useState(null);
   const [monthly, setMonthly] = useState(null);
@@ -2128,7 +2141,6 @@ export default function GymRoutineApp() {
   const dragVariantRef = useRef(null);
   const [dragVariantId, setDragVariantId] = useState(null);
   const [overVariantId, setOverVariantId] = useState(null);
-  const touchStartX = useRef(null);
   const dayNodesRef = useRef({});
   const prevDayRectsRef = useRef({});
   const [justMovedIds, setJustMovedIds] = useState([]);
@@ -2157,6 +2169,8 @@ export default function GymRoutineApp() {
   const pushSyncTimerRef = useRef(null);
   const [showApiKeyEdit, setShowApiKeyEdit] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
+  const [chatLoaded, setChatLoaded] = useState(false);
+  const [todayKey, setTodayKey] = useState(() => localDateKey(Date.now()));
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState(null);
 
@@ -2235,6 +2249,39 @@ export default function GymRoutineApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data ? data.weekKey : null, !!data]);
 
+  // Desde cuándo usa la app (para el mensaje de Joe's si nunca llegó a entrenar).
+  useEffect(() => {
+    if (!data || data.startedOn) return;
+    setData((prev) => {
+      if (!prev || prev.startedOn) return prev;
+      const first = (prev.history || []).reduce((acc, h) => (h && h.date && (!acc || h.date < acc) ? h.date : acc), '');
+      return { ...prev, startedOn: first || localDateKey(Date.now()) };
+    });
+  }, [data ? data.startedOn : null, !!data]);
+
+  // Joe's te escribe si pasan COACH_NUDGE_DAYS días sin anotar ningún entrenamiento.
+  const lastTrainedKey = data ? (data.history || []).reduce((acc, h) => (h && h.date > acc ? h.date : acc), '') : '';
+  useEffect(() => {
+    if (!chatLoaded || !data) return;
+    const nudge = coachNudgeFor(data, Date.now(), lang);
+    if (!nudge) return;
+    let seen = null;
+    try { seen = JSON.parse(localStorage.getItem(NUDGE_STORAGE) || 'null'); } catch (e) { /* noop */ }
+    if (seen && seen.ref === nudge.ref) return;
+    try { localStorage.setItem(NUDGE_STORAGE, JSON.stringify({ ref: nudge.ref, at: Date.now() })); } catch (e) { /* noop */ }
+    setChatMessages((prev) => (prev.some((m) => m.nudgeRef === nudge.ref) ? prev : [...prev, {
+      id: uid(), role: 'assistant', content: nudge.text, nudgeRef: nudge.ref, unread: true, at: Date.now(),
+    }]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatLoaded, !!data, lastTrainedKey, data ? data.startedOn : null, todayKey]);
+
+  // Al abrir el chat, los mensajes de Joe's quedan leídos (se apaga el punto rojo).
+  const hasUnreadChat = chatMessages.some((m) => m.unread);
+  useEffect(() => {
+    if (activeTab !== 'chat' || !hasUnreadChat) return;
+    setChatMessages((prev) => prev.map((m) => (m.unread ? { ...m, unread: false } : m)));
+  }, [activeTab, hasUnreadChat]);
+
   // Cada pestaña arranca desde arriba (si no, Progreso se abría a mitad de página).
   useEffect(() => {
     try { window.scrollTo(0, 0); } catch (e) { /* noop */ }
@@ -2242,7 +2289,9 @@ export default function GymRoutineApp() {
 
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === 'visible') setData((prev) => (prev ? rolloverData(prev) : prev));
+      if (document.visibilityState !== 'visible') return;
+      setData((prev) => (prev ? rolloverData(prev) : prev));
+      setTodayKey(localDateKey(Date.now()));
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
@@ -2343,6 +2392,7 @@ export default function GymRoutineApp() {
       } catch (e) {
         // sin historial guardado todavía
       }
+      setChatLoaded(true);
     })();
   }, []);
 
@@ -2876,28 +2926,6 @@ export default function GymRoutineApp() {
     onDrop: handleVariantDrop,
   });
 
-  const shiftVariant = (direction) => {
-    const idx = data.variants.findIndex((v) => v.id === data.activeVariant);
-    if (idx === -1) return;
-    const nextIdx = (idx + direction + data.variants.length) % data.variants.length;
-    setVariant(data.variants[nextIdx].id);
-  };
-
-  const handleTouchStart = (e) => {
-    if (e.target.closest('.drag-handle')) {
-      touchStartX.current = null;
-      return;
-    }
-    touchStartX.current = e.touches[0].clientX;
-  };
-  const handleTouchEnd = (e) => {
-    if (touchStartX.current === null) return;
-    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
-    touchStartX.current = null;
-    if (Math.abs(deltaX) < 100 || data.variants.length < 2) return;
-    shiftVariant(deltaX < 0 ? 1 : -1);
-  };
-
   const saveTitle = () => {
     setData({ ...data, title: titleDraft.trim() || data.title || DEFAULT_TITLES[getLang()] });
     setEditingTitle(false);
@@ -3085,8 +3113,30 @@ export default function GymRoutineApp() {
     return list[seed % list.length];
   };
 
-  const shareEntryStory = async (entry) => {
-    showToast(tr('storyGenerating'));
+  // Resumen de las series de un ejercicio para la tarjeta "Detalle":
+  // iguales → "4 series · 60 kg × 5"; distintas → "60 kg × 5 · 62,5 kg × 5 · …".
+  const setsSummary = (sets) => {
+    const labels = sets.map((x) => {
+      const kg = parseNumber(x.kg);
+      const reps = parseNumber(x.reps);
+      if (kg && reps) return `${formatKg(kg)} kg × ${formatKg(reps)}`;
+      if (reps) return trn('storyReps', reps);
+      if (kg) return `${formatKg(kg)} kg`;
+      return '';
+    }).filter(Boolean);
+    if (!labels.length) return trn('storySetsCount', sets.length);
+    if (labels.length > 1 && labels.every((l) => l === labels[0])) return `${trn('storySetsCount', labels.length)} · ${labels[0]}`;
+    return labels.join(' · ');
+  };
+
+  const targetFor = (entry, name) => {
+    const variant = (data.variants || []).find((v) => v.id === entry.variantId);
+    const day = variant && (variant.days || []).find((d) => d.id === entry.dayId);
+    const ex = day && (day.list || []).find((e) => e.name === name);
+    return ex && ex.sets ? ex.sets : '';
+  };
+
+  const shareEntryStory = (entry) => {
     const exercises = entryExercises(entry);
     const totalSets = exercises.reduce((n, e) => n + ((e.sets && e.sets.length) || 0), 0);
     const duration = workoutDurationMs(entry);
@@ -3097,7 +3147,8 @@ export default function GymRoutineApp() {
       { value: `${doneCount}/${totalCount}`, label: tr('storyExercises') },
     ];
     if (totalSets > 0) stats.push({ value: String(totalSets), label: tr('storySets') });
-    const opts = {
+    const footer = tr('storyFooter', { site: window.location.host });
+    const classic = {
       logoSrc: LOGO_DATA_URI,
       headline: doneCount >= totalCount ? tr('storyHeadlineFull') : tr('storyHeadline'),
       tag: entry.label,
@@ -3112,17 +3163,31 @@ export default function GymRoutineApp() {
       }),
       phrase: storyPhraseFor(entry),
       handle: '@YoSoyJoe',
-      footer: tr('storyFooter', { site: window.location.host }),
+      footer,
     };
-    try {
-      let blob;
-      try { blob = await drawStoryCard(opts); } catch (e) { blob = await drawStoryCard({ ...opts, logoSrc: null }); }
-      const result = await shareImage(blob, `average-joes-${entry.date}.png`, "Average Joe's");
-      if (result === 'downloaded') showToast(tr('storyDownloaded'));
-      else setToast(null);
-    } catch (e) {
-      showToast(tr('storyError'));
-    }
+    const label = String(entry.label || '').trim();
+    const detail = {
+      logoSrc: LOGO_DATA_URI,
+      headline: label && normalizeWeekday(label) !== entry.weekday ? label : tr('storyHeadline'),
+      subtitle: formatLongDate(entry.date),
+      stats,
+      exercises: exercises.filter((e) => e.done).map((e) => {
+        if (e.sets && e.sets.length) return { name: e.name, detail: setsSummary(e.sets) };
+        const target = e.target || targetFor(entry, e.name);
+        return { name: e.name, detail: target, muted: true };
+      }),
+      handle: '@YoSoyJoe',
+      footer,
+    };
+    // Si el logo no carga, la tarjeta se dibuja igual sin él.
+    const withFallback = (draw, opts) => () => draw(opts).catch(() => draw({ ...opts, logoSrc: null }));
+    setStoryPicker({
+      filename: `average-joes-${entry.date}.png`,
+      cards: [
+        { id: 'classic', label: tr('storyTplClassic'), desc: tr('storyTplClassicDesc'), render: withFallback(drawStoryCard, classic) },
+        { id: 'detail', label: tr('storyTplDetail'), desc: tr('storyTplDetailDesc'), render: withFallback(drawDetailCard, detail) },
+      ],
+    });
   };
 
   const shareDayStory = (day) => {
@@ -3229,10 +3294,6 @@ export default function GymRoutineApp() {
                       {getDisplayTitle(data)}
                     </h1>
                   )}
-                  <button type="button" className="week-pill" onClick={() => setActiveTab('progress')} aria-label={tr('weekPillAria', { n: stats.thisWeekCount, goal: stats.goal })}>
-                    <WeekDots dates={stats.thisWeekDates} compact />
-                    <span>{tr('weekPill', { n: stats.thisWeekCount, goal: stats.goal })}</span>
-                  </button>
                 </div>
               </div>
               <div className="header-icon-group">
@@ -3357,8 +3418,6 @@ export default function GymRoutineApp() {
               <main
                 key={transitionKey}
                 className={`day-grid day-grid-slide-${slideDir}`}
-                onTouchStart={handleTouchStart}
-                onTouchEnd={handleTouchEnd}
               >
                 {sortedDays.map((d) => (
                   <DayCard
@@ -3540,6 +3599,16 @@ export default function GymRoutineApp() {
           />
         ) : (
           <div className="apikey-tab-wrap">
+            {!apiKey && (() => {
+              const note = [...chatMessages].reverse().find((m) => m.nudgeRef);
+              if (!note || Date.now() - (note.at || 0) > 14 * 24 * 60 * 60 * 1000) return null;
+              return (
+                <div className="chat-bubble-row from-assistant coach-note">
+                  <img src={FAVICON_DATA_URI} alt="" className="chat-msg-avatar" />
+                  <div className="chat-bubble"><p>{note.content}</p></div>
+                </div>
+              );
+            })()}
             {apiKey && (
               <button className="onboarding-back-btn" onClick={() => setShowApiKeyEdit(false)}>
                 <ArrowLeft size={14} /> {tr('backToChat')}
@@ -3558,13 +3627,13 @@ export default function GymRoutineApp() {
 
       {activeTab === 'profile' && <BrandFooter />}
 
-      {!editMode && !openExercise && <FloatingTimer raised={activeTab === 'chat'} />}
+      {!editMode && !openExercise && !storyPicker && <FloatingTimer raised={activeTab === 'chat'} />}
 
       {editMode && activeTab === 'routines' && (
         <EditFloatingControls onSave={handleSaveClick} onUndo={handleUndo} canUndo={canUndo} />
       )}
 
-      <BottomNav activeTab={activeTab} onChange={setActiveTab} />
+      <BottomNav activeTab={activeTab} onChange={setActiveTab} chatUnread={hasUnreadChat} />
 
       {showTemplateBrowser && (
         <TemplateBrowserModal
@@ -3595,6 +3664,18 @@ export default function GymRoutineApp() {
         <SharedRoutineModal routine={sharedRoutine} onAccept={importSharedRoutine} onDismiss={() => setSharedRoutine(null)} />
       )}
 
+      {storyPicker && (
+        <StoryPicker
+          cards={storyPicker.cards}
+          filename={storyPicker.filename}
+          onClose={() => setStoryPicker(null)}
+          onResult={(result) => {
+            if (result === 'downloaded') showToast(tr('storyDownloaded'));
+            else if (result === 'error') showToast(tr('storyError'));
+          }}
+        />
+      )}
+
       <Toast toast={toast} />
 
       <ConfirmDialog state={confirmState} onCancel={closeConfirm} onConfirm={confirmAndRun} />
@@ -3606,6 +3687,7 @@ const styles = `
 @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap');
 
 * { box-sizing: border-box; }
+html, body { overflow-x: clip; }
 
 .app-root {
   min-height: 100vh;
@@ -3660,7 +3742,7 @@ const styles = `
   color: #EDEAE3; margin: 12px 0 8px; letter-spacing: 0.02em;
 }
 .picker-header p { color: #8B8A85; font-size: 13.5px; max-width: 440px; margin: 0 auto; line-height: 1.5; }
-.template-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.template-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 14px; }
 .template-card {
   background: #1C1D20; border: 1px solid #2A2B2F; border-radius: 12px; padding: 18px;
   text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 6px;
@@ -3692,7 +3774,11 @@ const styles = `
   align-items: center;
   gap: 12px;
   color: #B33A3A;
+  min-width: 0;
+  flex: 1 1 auto;
 }
+.brand > svg { flex-shrink: 0; }
+.brand > div { min-width: 0; }
 
 .brand h1 {
   font-family: 'Oswald', sans-serif;
@@ -3705,6 +3791,7 @@ const styles = `
   line-height: 1.1;
   display: inline-block;
   border-bottom: 1px solid transparent;
+  overflow-wrap: anywhere;
 }
 .brand h1.editable { cursor: pointer; }
 .brand h1.editable:hover { border-bottom-color: #3A3B3F; }
@@ -3723,7 +3810,8 @@ const styles = `
   padding: 0 6px;
   outline: none;
   line-height: 1.3;
-  max-width: 280px;
+  max-width: 100%;
+  width: 280px;
 }
 
 .subtitle {
@@ -3764,7 +3852,7 @@ const styles = `
 }
 .icon-toggle-btn:hover { color: #EDEAE3; border-color: #4E7A8C; }
 
-/* Envoltorio de pestañas (para el swipe y la animación al cambiar de sección) */
+/* Envoltorio de pestañas (animación al cambiar de sección) */
 .tab-panel-slide-right { animation: tab-slide-in-right 320ms cubic-bezier(0.22, 1, 0.36, 1); }
 .tab-panel-slide-left { animation: tab-slide-in-left 320ms cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes tab-slide-in-right {
@@ -4023,7 +4111,7 @@ const styles = `
   max-width: 980px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 16px;
 }
 
@@ -4039,6 +4127,7 @@ const styles = `
 }
 
 .day-card {
+  min-width: 0;
   background: #1C1D20;
   border: 1px solid #2A2B2F;
   border-radius: 12px;
@@ -4161,7 +4250,7 @@ const styles = `
 
 .ex-row {
   display: grid;
-  grid-template-columns: auto 1fr auto auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 8px;
   padding: 8px 6px;
@@ -4171,8 +4260,8 @@ const styles = `
 }
 .ex-row:hover { background: #212226; }
 .ex-row:active { cursor: grabbing; }
-.ex-row-editing { background: #212226; grid-template-columns: 1fr auto auto auto; cursor: default; }
-.ex-row-view { grid-template-columns: auto 1fr auto; cursor: default; }
+.ex-row-editing { background: #212226; grid-template-columns: minmax(0, 1fr) auto auto auto; cursor: default; }
+.ex-row-view { grid-template-columns: auto minmax(0, 1fr) auto; cursor: default; }
 .ex-row-view:hover { background: transparent; }
 
 .drag-handle {
@@ -4200,7 +4289,11 @@ const styles = `
 }
 .done-toggle.checked { background: var(--accent); border-color: var(--accent); }
 
-.ex-name { font-size: 13.5px; color: #EDEAE3; line-height: 1.3; }
+.ex-name { font-size: 13.5px; color: #EDEAE3; line-height: 1.3; overflow-wrap: anywhere; }
+@media (max-width: 380px) {
+  .ex-row { gap: 6px; }
+  .ex-sets { white-space: normal; text-align: center; max-width: 96px; }
+}
 .ex-row-done .ex-name { color: #6B6A65; text-decoration: line-through; }
 
 .ex-sets {
@@ -4228,15 +4321,20 @@ const styles = `
 
 .ex-input {
   background: #17181B; border: 1px solid #2E2F33; color: #EDEAE3; border-radius: 5px; padding: 6px 8px;
-  font-size: 13px; font-family: 'Inter', sans-serif; outline: none; width: 100%;
+  font-size: 13px; font-family: 'Inter', sans-serif; outline: none; width: 100%; min-width: 0;
 }
 .ex-input:focus { border-color: var(--accent); }
 .ex-input-sets { width: 100px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; }
 .ex-input-weight { width: 64px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; }
 
 .add-row {
-  display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; margin-top: 10px; padding-top: 10px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 8px; margin-top: 10px; padding-top: 10px;
   border-top: 1px dashed #2A2B2F;
+}
+@media (max-width: 380px) {
+  .add-row { gap: 6px; }
+  .add-row .ex-input-sets { width: 78px; }
+  .add-row .ex-input-weight { width: 50px; }
 }
 
 .empty-hint { font-size: 12.5px; color: #6B6A65; font-style: italic; padding: 6px; }
@@ -4560,6 +4658,20 @@ const styles = `
   opacity: 0.6;
 }
 .bottom-nav-item.active .bottom-nav-avatar { filter: none; opacity: 1; }
+.bottom-nav-icon { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.bottom-nav-dot {
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #E0453F;
+  box-shadow: 0 0 0 2px #1C1D20;
+  animation: nav-dot-in 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes nav-dot-in { from { transform: scale(0); } to { transform: scale(1); } }
+.coach-note { margin: 0 0 18px; }
 
 /* Onboarding */
 .onboarding-back-btn {
@@ -4596,7 +4708,7 @@ const styles = `
 
 .onboarding-choice-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 14px;
 }
 
@@ -4772,6 +4884,7 @@ const styles = `
 .onboarding-existing-code-row { display: flex; gap: 8px; }
 .onboarding-code-input {
   flex: 1;
+  min-width: 0;
   background: #1C1D20;
   border: 1px solid #2E2F33;
   color: #EDEAE3;
@@ -4969,23 +5082,6 @@ const styles = `
 }
 .day-congrats-share:hover { background: var(--accent); color: #fff; }
 
-.week-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-  padding: 5px 10px 5px 8px;
-  background: #1C1D20;
-  border: 1px solid #2A2B2F;
-  border-radius: 999px;
-  color: #B0AFA9;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11.5px;
-  cursor: pointer;
-}
-.week-pill:hover { border-color: #B33A3A; color: #EDEAE3; }
-.week-pill span { white-space: nowrap; }
-
 .tap-tip {
   max-width: 980px;
   margin: 0 auto 14px;
@@ -5030,6 +5126,38 @@ const styles = `
   animation: xs-up 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 @keyframes xs-up { from { transform: translateY(40px); opacity: 0.4; } to { transform: translateY(0); opacity: 1; } }
+
+/* Elegir tarjeta para historias */
+.sp-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0 16px; }
+.sp-option {
+  display: flex; flex-direction: column; align-items: stretch; gap: 4px;
+  background: none; border: none; padding: 0; color: inherit; text-align: left; cursor: pointer;
+  font-family: inherit;
+}
+.sp-thumb {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  aspect-ratio: 9 / 16; width: 100%; border-radius: 12px; overflow: hidden;
+  background: #17181B; border: 2px solid #2E2F33; color: #8E8D88;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.sp-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sp-thumb-msg { font-size: 12px; padding: 10px; text-align: center; }
+.sp-option.is-selected .sp-thumb { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+.sp-option:active .sp-thumb { transform: scale(0.98); }
+.sp-check {
+  position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 999px;
+  background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 0 2px #1C1D20;
+}
+.sp-label {
+  margin-top: 6px; font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 15px;
+  letter-spacing: 0.02em; text-transform: uppercase; color: #EDEAE3;
+}
+.sp-option:not(.is-selected) .sp-label { color: #B0AFA9; }
+.sp-desc { font-size: 12px; line-height: 1.35; color: #8E8D88; }
+.sp-share { width: 100%; padding: 13px 16px; font-size: 15px; border-radius: 12px; }
+.sp-share:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+@media (min-height: 760px) { .sp-options { gap: 16px; } }
 .xs-grabber { width: 40px; height: 4px; border-radius: 999px; background: #3A3B3F; margin: 2px auto 12px; }
 .xs-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .xs-head-text h2 {
