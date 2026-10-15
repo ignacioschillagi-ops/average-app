@@ -83,7 +83,7 @@ export const MOTIVATIONAL_PHRASES = {
   es: [
     'Entrenamiento completo. Bien ahí.',
     'Día liquidado. Andá a bañarte con orgullo.',
-    'Otro día tachado. El porrito te espera, te lo ganaste.',
+    'Otro día tachado. La birrita te espera, te la ganaste.',
     'Ahora sí, a comer como corresponde. Todo al músculo.',
     'Yeah Buddy! Ronnie y el Diego están orgullosos de vos.',
     'Bien ahí, campeón, titán, ídolo, mostro, animal, hijo de Zeus, Messi...',
@@ -91,14 +91,14 @@ export const MOTIVATIONAL_PHRASES = {
     'Entrenamiento terminado, y ese olor se empieza a sentir.',
     'Ese chivo sí se puede ver. Andá a bañarte nomás...',
     'Completaste todo, esas patas de pollo te lo agradecen.',
-    '¡Día ganado! Ya estás disimulando esa cara de artesanía prehispánica.',
+    '¡Día ganado! Ya estás disimulando esa cara de caricatura.',
     'Rutina cerrada por hoy. Ya sos menos desgarbado que ayer.',
     'Lista completa. No hiciste más que cumplir con tu tarea.',
   ],
   en: [
     'Workout complete. Nice one.',
     'Day crushed. Go hit the shower with pride.',
-    'Another day crossed off. That post-workout joint is waiting, you earned it.',
+    'Another day crossed off. That cold beer is waiting, you earned it.',
     'Now go eat like you mean it. All of it straight to the muscles.',
     'Yeah Buddy! Ronnie and Arnold are proud of you.',
     'Way to go, champ, titan, legend, beast, son of Zeus, GOAT...',
@@ -106,14 +106,14 @@ export const MOTIVATIONAL_PHRASES = {
     'Workout over, and that smell is starting to kick in.',
     'That sweat is visible from space. Just go shower...',
     'All done. Those chicken legs say thanks.',
-    "Day won! You're almost making up for that face.",
+    "Day won! You're already hiding that cartoon face.",
     "Routine closed for today. You're already less scrawny than yesterday.",
     'List complete. You just did what you were supposed to do.',
   ],
   it: [
     'Allenamento completato. Grande.',
     'Giornata archiviata. Vai a farti la doccia a testa alta.',
-    'Un altro giorno spuntato. La canna ti aspetta, te la sei guadagnata.',
+    'Un altro giorno spuntato. La birretta ti aspetta, te la sei guadagnata.',
     'Adesso sì, a mangiare come si deve. Tutto nei muscoli.',
     'Yeah Buddy! Ronnie e Maradona sono fieri di te.',
     'Grande, campione, titano, idolo, mostro, bestia, figlio di Zeus, fenomeno...',
@@ -121,10 +121,21 @@ export const MOTIVATIONAL_PHRASES = {
     "Allenamento finito, e quell'odore comincia a farsi sentire.",
     'Quel sudore si vede da qui. Vai a farti la doccia, dai...',
     'Hai completato tutto, quelle gambe da pollo ti ringraziano.',
-    'Giornata vinta! Quella faccia ormai passa quasi inosservata.',
+    'Giornata vinta! Quella faccia da caricatura ormai passa quasi inosservata.',
     'Scheda chiusa per oggi. Sei già meno smilzo di ieri.',
     'Lista completata. Hai solo fatto il tuo dovere.',
   ],
+};
+
+// Frases que se cambiaron: si alguien las tenía guardadas en un día completado, se muestran
+// con la versión nueva.
+const RETIRED_PHRASES = {
+  'Otro día tachado. El porrito te espera, te lo ganaste.': 2,
+  'Another day crossed off. That post-workout joint is waiting, you earned it.': 2,
+  'Un altro giorno spuntato. La canna ti aspetta, te la sei guadagnata.': 2,
+  '¡Día ganado! Ya estás disimulando esa cara de artesanía prehispánica.': 10,
+  "Day won! You're almost making up for that face.": 10,
+  'Giornata vinta! Quella faccia ormai passa quasi inosservata.': 10,
 };
 
 export const phraseLabel = (phrase, lang) => {
@@ -132,6 +143,7 @@ export const phraseLabel = (phrase, lang) => {
     const idx = MOTIVATIONAL_PHRASES[code].indexOf(phrase);
     if (idx !== -1) return MOTIVATIONAL_PHRASES[lang][idx];
   }
+  if (RETIRED_PHRASES[phrase] !== undefined) return MOTIVATIONAL_PHRASES[lang][RETIRED_PHRASES[phrase]];
   return phrase;
 };
 
@@ -226,6 +238,53 @@ const EXERCISES = [
   ['Burpees', 'Burpees', 'Burpees'],
   ['Escaladores (mountain climbers)', 'Mountain climbers', 'Mountain climber'],
   ['Plancha con toque de hombro', 'Plank shoulder taps', 'Plank con tocco spalla'],
+  // Equivalentes para el cambio rápido de ejercicio (ver data/alternatives.js)
+  ['Press banca con mancuernas', 'Dumbbell bench press', 'Panca piana con manubri'],
+  ['Press de pecho en máquina', 'Machine chest press', 'Chest press alla macchina'],
+  ['Flexiones con los pies elevados', 'Decline push-ups', 'Piegamenti con piedi rialzati'],
+  ['Flexiones con mochila cargada', 'Weighted backpack push-ups', 'Piegamenti con zaino carico'],
+  ['Aperturas con mancuernas', 'Dumbbell flyes', 'Croci con manubri'],
+  ['Pec deck', 'Pec deck', 'Pectoral machine'],
+  ['Flexiones abiertas', 'Wide push-ups', 'Piegamenti a presa larga'],
+  ['Press de hombros con mochila', 'Backpack overhead press', 'Lento avanti con zaino'],
+  ['Elevaciones laterales en polea', 'Cable lateral raises', 'Alzate laterali ai cavi'],
+  ['Elevaciones laterales en máquina', 'Machine lateral raises', 'Alzate laterali alla macchina'],
+  ['Elevaciones laterales con botellas', 'Lateral raises with water bottles', 'Alzate laterali con bottiglie'],
+  ['Pájaros en máquina', 'Reverse pec deck', 'Reverse pec deck'],
+  ['Y-T-W en el piso', 'Floor Y-T-W raises', 'Y-T-W a terra'],
+  ['Jalón con agarre neutro', 'Neutral-grip lat pulldown', 'Lat machine presa neutra'],
+  ['Superman con jalón', 'Superman pulls', 'Superman con tirata'],
+  ['Remo invertido bajo la mesa', 'Under-table inverted row', 'Rematore inverso sotto il tavolo'],
+  ['Remo con mancuerna', 'One-arm dumbbell row', 'Rematore con manubrio'],
+  ['Remo en polea baja', 'Seated cable row', 'Pulley basso'],
+  ['Sentadilla hack', 'Hack squat', 'Hack squat'],
+  ['Sentadilla goblet', 'Goblet squat', 'Goblet squat'],
+  ['Sentadilla con mochila', 'Backpack squat', 'Squat con zaino'],
+  ['Peso muerto rumano con mancuernas', 'Dumbbell Romanian deadlift', 'Stacco rumeno con manubri'],
+  ['Peso muerto a una pierna', 'Single-leg Romanian deadlift', 'Stacco rumeno a una gamba'],
+  ['Peso muerto con mochila', 'Backpack deadlift', 'Stacco con zaino'],
+  ['Hiperextensiones', 'Back extensions', 'Hyperextension'],
+  ['Zancadas con mancuernas', 'Dumbbell lunges', 'Affondi con manubri'],
+  ['Subidas al cajón', 'Step-ups', 'Step-up'],
+  ['Sentadilla sissy', 'Sissy squat', 'Sissy squat'],
+  ['Sentadilla isométrica contra la pared', 'Wall sit', 'Wall sit'],
+  ['Curl nórdico', 'Nordic curl', 'Nordic curl'],
+  ['Curl femoral con toalla en el piso', 'Towel slider leg curl', 'Leg curl con asciugamano'],
+  ['Gemelos a una pierna en escalón', 'Single-leg calf raise on a step', 'Calf raise a una gamba sul gradino'],
+  ['Curl en polea', 'Cable curl', 'Curl ai cavi'],
+  ['Curl con mochila', 'Backpack curl', 'Curl con zaino'],
+  ['Extensión de tríceps por encima de la cabeza', 'Overhead triceps extension', 'Estensioni tricipiti sopra la testa'],
+  ['Flexiones diamante', 'Diamond push-ups', 'Piegamenti a diamante'],
+  ['Fondos en silla', 'Chair dips', 'Dip sulla sedia'],
+  ['Crunch en el piso', 'Floor crunches', 'Crunch a terra'],
+  ['Elevación de piernas acostado', 'Lying leg raises', 'Sollevamento gambe da sdraiato'],
+  ['Plancha lateral', 'Side plank', 'Plank laterale'],
+  ['Encogimientos con mancuernas', 'Dumbbell shrugs', 'Scrollate con manubri'],
+  ['Encogimientos con mochila', 'Backpack shrugs', 'Scrollate con zaino'],
+  ['Patada lateral acostado', 'Side-lying leg raises', 'Slanci laterali da sdraiato'],
+  ['Caminata lateral con banda', 'Banded lateral walk', 'Camminata laterale con elastico'],
+  ['Saltos de tijera', 'Jumping jacks', 'Jumping jack'],
+  ['Saltar la soga', 'Jump rope', 'Salto della corda'],
 ];
 
 // Etiquetas de los días (qué se entrena).
@@ -261,6 +320,19 @@ const buildLookup = (rows) => {
 };
 const EXERCISE_LOOKUP = buildLookup(EXERCISES);
 const TAG_LOOKUP = buildLookup(TAGS);
+
+// Clave estable de un ejercicio, igual en los 3 idiomas: el nombre en español de la lista si
+// es conocido, o el nombre escrito (sin tildes ni mayúsculas) si no. Sirve para guardar el
+// historial de cargas sin que se pierda al cambiar de idioma.
+export const exerciseKey = (name) => {
+  const row = EXERCISE_LOOKUP[normalizeText(name)];
+  return row ? normalizeText(row[0]) : normalizeText(name);
+};
+// Nombre en español de la lista (o null si no es un ejercicio conocido).
+export const canonicalExerciseName = (name) => {
+  const row = EXERCISE_LOOKUP[normalizeText(name)];
+  return row ? row[0] : null;
+};
 
 export const translateExerciseName = (name, lang) => {
   const row = EXERCISE_LOOKUP[normalizeText(name)];
@@ -371,6 +443,7 @@ export const translateRoutineData = (data, lang) => {
     ...e,
     name: translateExerciseName(e.name, lang),
     sets: translateSets(e.sets, lang),
+    ...(e.swappedFrom ? { swappedFrom: { ...e.swappedFrom, name: translateExerciseName(e.swappedFrom.name, lang) } } : {}),
   }));
   return {
     ...data,

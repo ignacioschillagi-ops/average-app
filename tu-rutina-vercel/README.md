@@ -1,4 +1,4 @@
-# Tu rutina
+# Average Joe's app
 
 Proyecto Vite + React listo para deployar en Vercel.
 
@@ -30,9 +30,10 @@ Proyecto Vite + React listo para deployar en Vercel.
   de un día (`MIN_DONE_RATIO` en `src/App.jsx`), se guarda un registro en `data.history` con
   la fecha, el día (ej. "FUERZA"), la rutina a la que pertenece, cuántos ejercicios hizo
   (ej. "4 de 6", cuáles sí y cuáles no) y el tiempo desde la primera casilla hasta la última.
-  Si sigue tildando, el mismo registro se actualiza. Se ve en un calendario mensual que se
-  abre desde la tarjeta "Historial de entrenamientos" arriba de todo en Perfil. Viaja con el
-  resto de los datos, así que también se sincroniza con el código.
+  Si sigue tildando, el mismo registro se actualiza. Un ejercicio cuenta como hecho si se
+  tildó o si tiene al menos una serie anotada. Se ve en un calendario mensual dentro de la
+  pestaña **Progreso** (la tarjeta "Historial de entrenamientos" de Perfil lleva directo
+  ahí). Viaja con el resto de los datos, así que también se sincroniza con el código.
   Detalles: si desmarca casillas y baja de la mitad durante el mismo entrenamiento, el
   registro se quita (por si fue sin querer), pero desmarcar días después no borra nada viejo;
   si pasan más de 12 h desde que arrancó, lo que tilde cuenta como un entrenamiento nuevo; y
@@ -51,12 +52,48 @@ Proyecto Vite + React listo para deployar en Vercel.
     3 idiomas) y la búsqueda de ejercicios en wger.de usa ese idioma.
   - Los días de la semana se guardan siempre en español como clave interna y se muestran
     traducidos, así que cambiar de idioma no rompe nada.
+- **Registro por serie y "la vez pasada"**: tocando el nombre de un ejercicio se abre una
+  hoja con cuatro vistas (Series · Progreso · Técnica · Cambiar). En Series se anotan kg y
+  repeticiones de cada serie (opcional: tildar el ejercicio sin anotar sigue funcionando).
+  Arriba aparece lo que hizo la vez pasada, con "Repetir" y "+2,5 kg" para no tipear; al
+  marcar una serie arranca solo el descanso. Lo anotado se guarda en `data.lifts` (por
+  ejercicio, independiente del idioma) y en el registro del historial. Lógica en
+  `src/lib/lifts.js`; la hoja en `src/components/ExerciseSheet.jsx`.
+- **Progreso y récords**: gráfico por ejercicio (mejor serie de cada sesión,
+  `src/components/ProgressChart.jsx`) y aviso al batir un récord de peso o de repeticiones
+  (solo cuando ya hay sesiones anteriores para comparar).
+- **Técnica**: la vista Técnica busca el ejercicio en wger.de (imagen, músculos, equipo y
+  descripción, `src/lib/wger.js`), sin pasar por el chat.
+- **Objetivo semanal en vez de racha diaria** (`src/lib/weekly.js`): por defecto es la
+  cantidad de días de la rutina activa y se cambia en Progreso. Una semana con un día menos
+  que el objetivo igual cuenta para las "semanas seguidas". **Cada lunes la rutina se
+  reinicia sola** (se destildan ejercicios y series; el historial queda).
+- **Cambio rápido de ejercicio** ("Máquina ocupada" / "Estoy en casa"), sin IA: alternativas
+  por patrón de movimiento y equipo en `src/data/alternatives.js`. "Solo por hoy" vuelve
+  solo al original al día siguiente; "Reemplazar" lo cambia para siempre.
+- **Joe's conoce tu historial**: a sus instrucciones se suma un resumen real (objetivo y
+  semanas, días que más se saltean, cargas de las últimas 6 semanas, récords) armado en
+  `buildHistoryContext` (`src/joe-prompt.js`). Hay botones rápidos en el chat para pedir el
+  resumen de la semana, cómo vienen las cargas o ajustar la rutina a lo que se cumple.
+- **Compartir**:
+  - Rutina como link (botón de compartir arriba de la rutina): todo viaja dentro del link
+    (`#rutina=...`, `src/lib/share.js`), no usa servidor. Al abrirlo se ofrece cargarla,
+    traducida al idioma de quien la abre.
+  - Tarjeta para historias de Instagram al completar un día o desde el historial
+    (1080×1920, `src/lib/storyCard.js`), con logo, frase de Joe's y @YoSoyJoe.
+  - **La rutina del mes de Joe**: se edita a mano en `public/rutina-del-mes.json` (adentro
+    tiene las instrucciones). Aparece primera al elegir plantilla mientras `month` coincida
+    con el mes actual; si no coincide, no se muestra.
+- **Compañeros** (pestaña Progreso): cada uno comparte un código de 6 letras y el otro ve
+  solo si fue o no esta semana (puntos, objetivo, semanas seguidas). Nada de feed ni likes.
+  Necesita el código de sincronización y la misma base de datos (ver abajo):
+  `api/buddy-publish.js` y `api/buddy-get.js`. Dejar de compartir borra el resumen.
 - **Funciona sin internet (menos el chat)**: agregué `vite-plugin-pwa`, que genera un
   service worker (`vite.config.js`). Una vez que se abrió la app con conexión al menos una
   vez (o se instaló en el celu), el resto de las veces carga y funciona sin internet: ver y
   editar rutinas, tildar ejercicios, el cronómetro, todo local. Lo único que sigue
-  necesitando conexión sí o sí es el chat con Joe's, porque habla en vivo con Groq — eso no
-  se puede cachear. No hace falta ningún APK ni empaquetado nativo para esto, es estándar
+  necesitando conexión sí o sí es el chat con Joe's (habla en vivo con Groq o Gemini), la
+  vista Técnica y los compañeros. No hace falta ningún APK ni empaquetado nativo para esto, es estándar
   de cualquier PWA instalada.
 - **Consultas de ejercicios (wger.de)**: cuando el usuario tiene dudas sobre un ejercicio,
   Joe's puede pedirle a la app que busque en la base pública de wger.de (en español, sin
@@ -99,8 +136,11 @@ Archivos de esta parte:
 api/
 ├── sync-generate.js   # POST — genera un código único (Nombre+2 dígitos) y lo crea vacío en KV
 ├── sync-get.js        # GET  — trae { data, apiKey } guardados bajo un código
-└── sync-save.js       # POST — sobreescribe { data, apiKey } bajo un código existente
+├── sync-save.js       # POST — sobreescribe { data, apiKey } bajo un código existente
+├── buddy-publish.js   # POST — publica (o borra) el resumen semanal para compañeros
+└── buddy-get.js       # GET  — trae el resumen de un compañero por su código de 6 letras
 ```
+Los compañeros usan la misma base: si la sincronización funciona, esto también.
 
 **Nota de privacidad**: estas funciones no tienen ninguna verificación además del código en
 sí — tal como lo charlamos, el código funciona como usuario+contraseña juntos en uno. No hay
@@ -137,10 +177,10 @@ vercel
 ├── package.json
 ├── vite.config.js      # incluye vite-plugin-pwa (service worker / offline)
 ├── api/
-│   ├── sync-generate.js
-│   ├── sync-get.js
-│   └── sync-save.js
+│   ├── sync-generate.js / sync-get.js / sync-save.js
+│   └── buddy-publish.js / buddy-get.js
 ├── public/
+│   ├── rutina-del-mes.json  # la rutina del mes de Joe (editar a mano cada mes)
 │   ├── favicon.svg
 │   ├── icon-180.png     # apple-touch-icon
 │   ├── icon-192.png     # ícono para Android / manifest
@@ -150,6 +190,22 @@ vercel
     ├── main.jsx          # punto de entrada de React
     ├── App.jsx           # toda la app (lo que antes era el artifact)
     ├── i18n.js           # textos de pantalla en español, inglés e italiano
+    ├── i18n-features.js  # textos de las funciones nuevas (series, progreso, compartir…)
     ├── i18n-content.js   # ejercicios, etiquetas, frases, días, meses y plantillas traducidos
-    └── joe-prompt.js     # instrucciones de Joe's (la IA) en los 3 idiomas
+    ├── joe-prompt.js     # instrucciones de Joe's (la IA) + resumen del historial
+    ├── components/
+    │   ├── ExerciseSheet.jsx    # hoja del ejercicio: series, progreso, técnica, cambiar
+    │   ├── ProgressChart.jsx    # gráfico de un ejercicio
+    │   ├── ProgressTab.jsx      # pestaña Progreso: semana, historial, récords, compañeros
+    │   └── HistoryCalendar.jsx  # calendario del historial
+    ├── data/
+    │   └── alternatives.js      # alternativas por patrón de movimiento y equipo
+    └── lib/
+        ├── dates.js      # fechas y semanas
+        ├── lifts.js      # series, la vez pasada, récords, 1RM estimado
+        ├── weekly.js     # objetivo semanal y semanas seguidas
+        ├── restTimer.js  # cronómetro de descanso compartido
+        ├── share.js      # links de rutina y compartir archivos
+        ├── storyCard.js  # tarjeta para historias
+        └── wger.js       # búsqueda en wger.de
 ```

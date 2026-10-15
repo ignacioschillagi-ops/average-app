@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icon-180.png'],
       manifest: {
-        name: "Tu rutina · Average Joe's",
-        short_name: 'Tu rutina',
+        name: "Average Joe's",
+        short_name: "Average Joe's",
         start_url: '.',
         display: 'standalone',
         lang: 'es',

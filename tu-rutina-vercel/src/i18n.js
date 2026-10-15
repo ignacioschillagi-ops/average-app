@@ -5,6 +5,8 @@
 // **así** se muestra en negrita, ~así~ en cursiva.
 // Si a un idioma le falta una clave, se usa la de español.
 
+import FEATURE_STRINGS from './i18n-features';
+
 export const LANGUAGES = [
   { code: 'es', label: 'Español' },
   { code: 'en', label: 'English' },
@@ -33,9 +35,17 @@ export const detectInitialLang = () => {
   return 'es';
 };
 
+const lookup = (lang, key) => {
+  const base = STRINGS[lang];
+  if (base && base[key] !== undefined) return base[key];
+  const extra = FEATURE_STRINGS[lang];
+  if (extra && extra[key] !== undefined) return extra[key];
+  return undefined;
+};
+
 export const tr = (key, vars) => {
-  const table = STRINGS[currentLang] || STRINGS.es;
-  let text = table[key] !== undefined ? table[key] : STRINGS.es[key];
+  let text = lookup(currentLang, key);
+  if (text === undefined) text = lookup('es', key);
   if (text === undefined) return key;
   if (vars) {
     Object.keys(vars).forEach((k) => {
@@ -262,7 +272,7 @@ const STRINGS = {
     yourCode: 'Tu código',
     shareCopied: '¡Copiado! Pegalo donde quieras',
     shareApp: 'Compartir la app con amigos',
-    shareTitle: 'Tu rutina · Average Joe\'s',
+    shareTitle: 'Average Joe\'s',
     shareText: 'Che, mirá esta app para armar tus rutinas de gym, con cronómetro y hasta un entrenador con IA.',
     backToChat: 'Volver al chat',
   },
@@ -480,7 +490,7 @@ const STRINGS = {
     yourCode: 'Your code',
     shareCopied: 'Copied! Paste it anywhere',
     shareApp: 'Share the app with friends',
-    shareTitle: "Your routine · Average Joe's",
+    shareTitle: "Average Joe's",
     shareText: 'Check out this app for building your gym routines, with a timer and even an AI coach.',
     backToChat: 'Back to chat',
   },
@@ -698,7 +708,7 @@ const STRINGS = {
     yourCode: 'Il tuo codice',
     shareCopied: 'Copiato! Incollalo dove vuoi',
     shareApp: "Condividi l'app con gli amici",
-    shareTitle: "La tua scheda · Average Joe's",
+    shareTitle: "Average Joe's",
     shareText: "Guarda questa app per creare le tue schede da palestra, con timer e persino un coach con IA.",
     backToChat: 'Torna alla chat',
   },

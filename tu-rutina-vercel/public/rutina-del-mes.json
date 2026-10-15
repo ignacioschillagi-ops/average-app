@@ -1,0 +1,20 @@
+{
+  "_comoEditar": "Cambiá este archivo cada mes desde GitHub y Vercel lo publica solo. 'month' es AAAA-MM. Los días van en español (Lunes...Domingo). Los ejercicios conviene escribirlos como en las plantillas para que se traduzcan solos al inglés y al italiano; los que no estén en la lista se muestran tal cual. Si 'month' no es el mes actual, la tarjeta no aparece.",
+  "month": "2026-10",
+  "name": {
+    "es": "Torso/Pierna de Joe",
+    "en": "Joe's Upper/Lower",
+    "it": "Parte alta/bassa di Joe"
+  },
+  "description": {
+    "es": "4 días: dos de fuerza pesada y dos de volumen. Ideal si ya entrenás hace un tiempo.",
+    "en": "4 days: two heavy strength days and two volume days. Great if you've been training for a while.",
+    "it": "4 giorni: due di forza pesante e due di volume. Ideale se ti alleni già da un po'."
+  },
+  "days": [
+    { "weekday": "Lunes", "focus": "TORSO", "exercises": [["Press banca barra", "4x5"], ["Remo con barra", "4x6"], ["Press militar barra", "3x6"], ["Dominadas", "3x6-8"], ["Curl martillo", "3x10"]] },
+    { "weekday": "Martes", "focus": "PIERNA", "exercises": [["Sentadilla libre", "4x5"], ["Peso muerto rumano", "3x8"], ["Zancadas caminando", "3x10 c/pierna"], ["Gemelos de pie", "4x12"], ["Plancha", "3x40s"]] },
+    { "weekday": "Jueves", "focus": "TORSO", "exercises": [["Press inclinado con mancuernas", "4x10"], ["Jalón al pecho", "4x10"], ["Elevaciones laterales", "4x15"], ["Remo en polea baja", "3x12"], ["Extensión de tríceps en polea", "3x12"]] },
+    { "weekday": "Viernes", "focus": "PIERNA", "exercises": [["Prensa de piernas", "4x12"], ["Hip thrust", "4x10"], ["Curl femoral", "3x12"], ["Extensión de cuádriceps", "3x15"], ["Elevación de piernas colgado", "3x12"]] }
+  ]
+}
