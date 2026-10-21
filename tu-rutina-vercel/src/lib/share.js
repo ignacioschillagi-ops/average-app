@@ -23,7 +23,8 @@ export const encodeRoutine = (variant, lang) => {
       Math.max(0, WEEKDAY_KEYS.indexOf(d.weekday)),
       d.tagLabel || '',
       // Un cambio "solo por hoy" no es parte de la rutina: se comparte el ejercicio original.
-      (d.list || []).map((e) => [(e.swappedFrom && e.swappedFrom.name) || e.name, e.sets || '']),
+      // Lo agregado "solo hoy" tampoco.
+      (d.list || []).filter((e) => !e.tempDate).map((e) => [(e.swappedFrom && e.swappedFrom.name) || e.name, e.sets || '']),
     ]),
   };
   return toBase64Url(JSON.stringify(payload));

@@ -1,13 +1,14 @@
 // Hoja que se abre al tocar un ejercicio de la rutina. Todo lo de ese ejercicio en un lugar:
 //   - Series: anotar peso y reps por serie, con "la vez pasada" y atajos para repetir o subir.
 //   - Progreso: gráfico y récords.
-//   - Cómo se hace: ficha de wger.de.
-//   - Cambiar: equivalentes si la máquina está ocupada o estás en casa.
+//   - Técnica: búsqueda en Google (web o videos) o preguntarle a Joe's.
+//   - Cambiar: equivalentes si la máquina está ocupada o estás en casa, o uno escrito a mano.
 // Anotar series es opcional: tildar el ejercicio desde la lista sigue funcionando igual.
+// Se cierra con la X, tocando afuera o arrastrándola hacia abajo.
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  X, Check, Plus, Minus, Repeat, TrendingUp, BookOpen, ArrowLeftRight, Loader2, ExternalLink,
-  Trophy, Timer, MessageCircle, ListChecks,
+  X, Check, Plus, Minus, Repeat, TrendingUp, BookOpen, ArrowLeftRight, ExternalLink,
+  Trophy, Timer, MessageCircle, ListChecks, PlayCircle, PenLine,
 } from 'lucide-react';
 import { tr, getLang } from '../i18n';
 import { translateExerciseName } from '../i18n-content';
@@ -17,9 +18,10 @@ import {
 } from '../lib/lifts';
 import { localDateKey, daysAgoLabel, formatShortDate } from '../lib/dates';
 import { alternativesFor } from '../data/alternatives';
-import { lookupExerciseInfo, wgerSearchUrl } from '../lib/wger';
 import { restTimer, useRestTimer, formatTime } from '../lib/restTimer';
 import ProgressChart from './ProgressChart';
+import ExerciseNameInput from './ExerciseNameInput';
+import useSheetDrag from '../lib/useSheetDrag';
 
 const newId = () => Math.random().toString(36).slice(2, 10);
 // Número para un campo de texto, con la coma o el punto que corresponde al idioma.
@@ -40,7 +42,7 @@ function RestBar() {
   );
 }
 
-function SetsView({ exercise, lifts, onChange, onRecord }) {
+function SetsView({ exercise, lifts, othersDone, onChange, onRecord }) {
   const plan = planSets(exercise.sets);
   const log = currentLog(exercise);
   const prev = lastSession(lifts, exercise.name, log ? log.id : null);
@@ -94,7 +96,10 @@ function SetsView({ exercise, lifts, onChange, onRecord }) {
     const next = rows.map((x, idx) => (idx === i ? doneRow : x));
     writeRows(next);
     if (record) onRecord(record, exercise.name);
-    if (!next.every((x) => x.done)) restTimer.start();
+    // Descanso después de cada serie, también la última del ejercicio (pasás al siguiente).
+    // Si era lo último del día, no: el entrenamiento terminó.
+    if (next.every((x) => x.done) && othersDone) restTimer.stop();
+    else restTimer.start();
   };
 
   const fillFromPrev = (bump) => {
@@ -239,46 +244,30 @@ function ProgressView({ exercise, lifts }) {
   );
 }
 
-function HowToView({ exercise, onAskJoe }) {
-  const [state, setState] = useState({ status: 'loading', result: null });
-  useEffect(() => {
-    let alive = true;
-    setState({ status: 'loading', result: null });
-    lookupExerciseInfo(exercise.name)
-      .then((result) => alive && setState({ status: result ? 'done' : 'empty', result }))
-      .catch(() => alive && setState({ status: 'error', result: null }));
-    return () => { alive = false; };
-  }, [exercise.name]);
+const googleUrl = (query, videos) => {
+  const lang = getLang();
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=${lang}${videos ? '&tbm=vid' : ''}`;
+};
 
-  if (state.status === 'loading') {
-    return <div className="xs-loading"><Loader2 size={15} className="spin" /> {tr('searchingWger', { q: exercise.name })}</div>;
-  }
-  if (state.status !== 'done') {
-    return (
-      <div className="xs-howto-empty">
-        <p>{state.status === 'error' ? tr('wgerFetchFail') : tr('wgerNotFound', { q: exercise.name })}</p>
-        <div className="xs-howto-actions">
-          <a className="xs-btn" href={wgerSearchUrl()} target="_blank" rel="noopener noreferrer">
-            <ExternalLink size={14} /> {tr('wgerSearchIt')}
-          </a>
-          {onAskJoe && (
-            <button type="button" className="xs-btn" onClick={() => onAskJoe(tr('askJoeHowTo', { name: exercise.name }))}>
-              <MessageCircle size={14} /> {tr('askJoe')}
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-  const r = state.result;
+function HowToView({ exercise, onAskJoe }) {
+  const query = tr('howToQuery', { name: exercise.name });
   return (
-    <div className="xs-howto">
-      {r.images[0] && <img src={r.images[0]} alt={r.name} className="xs-howto-img" loading="lazy" />}
-      <div className="xs-howto-name">{r.name}</div>
-      {r.muscles.length > 0 && <div className="xs-howto-meta">{tr('muscles')}: {r.muscles.join(', ')}</div>}
-      {r.equipment.length > 0 && <div className="xs-howto-meta">{tr('equipment')}: {r.equipment.join(', ')}</div>}
-      {r.description && <p className="xs-howto-desc">{r.description}</p>}
-      <div className="xs-howto-credit">{tr('wgerCredit')}</div>
+    <div className="xs-howto-google">
+      <p className="xs-hint">{tr('howToIntro')}</p>
+      <div className="xs-howto-query">“{query}”</div>
+      <div className="xs-howto-buttons">
+        <a className="xs-btn xs-btn-accent xs-btn-big" href={googleUrl(query, false)} target="_blank" rel="noopener noreferrer">
+          <ExternalLink size={16} /> {tr('howToGoogle')}
+        </a>
+        <a className="xs-btn xs-btn-big" href={googleUrl(query, true)} target="_blank" rel="noopener noreferrer">
+          <PlayCircle size={16} /> {tr('howToVideos')}
+        </a>
+        {onAskJoe && (
+          <button type="button" className="xs-btn xs-btn-big" onClick={() => onAskJoe(tr('askJoeHowTo', { name: exercise.name }))}>
+            <MessageCircle size={16} /> {tr('askJoe')}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -289,6 +278,8 @@ function SwapView({ exercise, onSwap, onRevertSwap, onAskJoe }) {
   const lang = getLang();
   const original = exercise.swappedFrom ? exercise.swappedFrom.name : exercise.name;
   const alts = alternativesFor(original, reason);
+  const [custom, setCustom] = useState('');
+  const customName = custom.trim();
   return (
     <div className="xs-swap">
       {exercise.swappedFrom && (
@@ -297,6 +288,22 @@ function SwapView({ exercise, onSwap, onRevertSwap, onAskJoe }) {
           <button type="button" className="xs-btn" onClick={onRevertSwap}>{tr('swapBack', { name: exercise.swappedFrom.name })}</button>
         </div>
       )}
+      <div className="xs-swap-custom">
+        <span className="xs-swap-custom-label"><PenLine size={13} /> {tr('swapCustomLabel')}</span>
+        <ExerciseNameInput
+          value={custom}
+          onChange={setCustom}
+          placeholder={tr('swapCustomPlaceholder')}
+          exclude={[exercise.name]}
+        />
+        {customName && (
+          <div className="xs-alt-actions xs-swap-custom-actions">
+            <button type="button" className="xs-btn xs-btn-accent" onClick={() => onSwap('today', customName)}>{tr('swapToday')}</button>
+            <button type="button" className="xs-btn" onClick={() => onSwap('replace', customName)}>{tr('swapReplace')}</button>
+          </div>
+        )}
+      </div>
+      <p className="xs-swap-or">{tr('swapOrPick')}</p>
       <div className="xs-segment xs-segment-small" role="tablist">
         <button type="button" role="tab" aria-selected={reason === 'busy'} className={reason === 'busy' ? 'active' : ''} onClick={() => { setReason('busy'); setPick(null); }}>
           {tr('swapBusy')}
@@ -349,10 +356,12 @@ const VIEWS = [
 ];
 
 export default function ExerciseSheet({
-  exercise, lifts, accent, initialView = 'sets', onChange, onSwap, onRevertSwap, onRecord, onAskJoe, onClose,
+  exercise, lifts, accent, othersDone, initialView = 'sets', onChange, onSwap, onRevertSwap, onRecord, onAskJoe, onClose,
 }) {
   const [view, setView] = useState(initialView);
   const sheetRef = useRef(null);
+  const overlayRef = useRef(null);
+  useSheetDrag(sheetRef, overlayRef, onClose);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -364,7 +373,7 @@ export default function ExerciseSheet({
 
   if (!exercise) return null;
   return (
-    <div className="xs-overlay" onClick={onClose}>
+    <div className="xs-overlay" ref={overlayRef} onClick={onClose}>
       <div
         className="xs-sheet"
         ref={sheetRef}
@@ -374,8 +383,8 @@ export default function ExerciseSheet({
         onClick={(e) => e.stopPropagation()}
         style={{ '--accent': accent || '#B33A3A' }}
       >
-        <div className="xs-grabber" aria-hidden="true" />
-        <div className="xs-head">
+        <div className="xs-grabber-zone" data-drag-handle><div className="xs-grabber" aria-hidden="true" /></div>
+        <div className="xs-head" data-drag-handle>
           <div className="xs-head-text">
             <h2>{exercise.name}</h2>
             <p>
@@ -397,7 +406,7 @@ export default function ExerciseSheet({
         </div>
         <RestBar />
         <div className="xs-body">
-          {view === 'sets' && <SetsView exercise={exercise} lifts={lifts} onChange={onChange} onRecord={onRecord} />}
+          {view === 'sets' && <SetsView exercise={exercise} lifts={lifts} othersDone={othersDone} onChange={onChange} onRecord={onRecord} />}
           {view === 'progress' && <ProgressView exercise={exercise} lifts={lifts} />}
           {view === 'howto' && <HowToView exercise={exercise} onAskJoe={onAskJoe} />}
           {view === 'swap' && <SwapView exercise={exercise} onSwap={onSwap} onRevertSwap={onRevertSwap} onAskJoe={onAskJoe} />}

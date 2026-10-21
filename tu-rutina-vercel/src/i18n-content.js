@@ -8,6 +8,8 @@
 // Los días de la semana se guardan SIEMPRE en español ('Lunes', 'Martes'...) como clave
 // interna, y se muestran traducidos con weekdayLabel().
 
+import { LIBRARY } from './data/exercise-library';
+
 export const LANG_CODES = ['es', 'en', 'it'];
 const COL = { es: 0, en: 1, it: 2 };
 
@@ -318,7 +320,30 @@ const buildLookup = (rows) => {
   }));
   return map;
 };
-const EXERCISE_LOOKUP = buildLookup(EXERCISES);
+// Las de la biblioteca (cambio rápido) van después: si un nombre está en las dos, manda EXERCISES.
+const LIBRARY_ROWS = LIBRARY.map((r) => r.slice(0, 3));
+const EXERCISE_LOOKUP = buildLookup([...EXERCISES, ...LIBRARY_ROWS]);
+
+// Nombres para sugerir mientras se escribe un ejercicio, en el idioma pedido (sin combinados
+// ni variantes del mismo: "Press inclinado mancuernas" y "con mancuernas" son uno solo).
+const SUGGESTION_CACHE = {};
+export const exerciseSuggestions = (lang) => {
+  if (SUGGESTION_CACHE[lang]) return SUGGESTION_CACHE[lang];
+  const col = COL[lang] != null ? COL[lang] : 0;
+  const seen = new Set();
+  const out = [];
+  [...EXERCISES, ...LIBRARY_ROWS].forEach((row) => {
+    const name = row[col];
+    const key = normalizeText(name);
+    const same = normalizeText(row[1]);
+    if (seen.has(key) || seen.has(`en:${same}`) || /\+|:/.test(name)) return;
+    seen.add(key);
+    seen.add(`en:${same}`);
+    out.push(name);
+  });
+  SUGGESTION_CACHE[lang] = out;
+  return out;
+};
 const TAG_LOOKUP = buildLookup(TAGS);
 
 // Clave estable de un ejercicio, igual en los 3 idiomas: el nombre en español de la lista si

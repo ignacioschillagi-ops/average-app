@@ -91,6 +91,56 @@ export function WeeklyGoalCard({ stats, onGoalChange, onAskJoe }) {
 
 // ---------- Récords ----------
 
+// 1RM aproximado (fórmula de Epley sobre la mejor serie de hasta 12 repeticiones).
+const roundHalf = (n) => Math.round(n * 2) / 2;
+function OneRMInfo({ bests, bodyweight }) {
+  if (bodyweight) return <p className="pg-1rm-note">{tr('oneRMBodyweight')}</p>;
+  const b = bests.best1RM;
+  if (!b) return <p className="pg-1rm-note">{tr('oneRMHighReps')}</p>;
+  const value = roundHalf(b.value);
+  return (
+    <div className="pg-1rm">
+      <div className="pg-1rm-head">
+        <span className="pg-1rm-label">{tr('oneRMTitle')}</span>
+        <span className="pg-1rm-value">≈ {formatKg(value)} kg</span>
+      </div>
+      <p className="pg-1rm-text">{tr('oneRMExplain', { set: formatSet({ kg: b.kg, reps: b.reps }) })}</p>
+      <p className="pg-1rm-pct">{tr('oneRMPercents', { p80: `${formatKg(roundHalf(value * 0.8))} kg`, p70: `${formatKg(roundHalf(value * 0.7))} kg` })}</p>
+    </div>
+  );
+}
+
+const RECORDS_OPEN_KEY = 'records-open-v1';
+function RecordsSection({ lifts }) {
+  const [open, setOpen] = useState(() => {
+    try { return localStorage.getItem(RECORDS_OPEN_KEY) === '1'; } catch (e) { return false; }
+  });
+  const count = Object.values(lifts || {}).filter((entries) => progressSeries(entries).length > 0).length;
+  const toggle = () => {
+    setOpen((o) => {
+      try { localStorage.setItem(RECORDS_OPEN_KEY, o ? '0' : '1'); } catch (e) { /* noop */ }
+      return !o;
+    });
+  };
+  return (
+    <section className={`pg-card pg-collapsible ${open ? 'is-open' : ''}`}>
+      <button type="button" className="pg-collapse-head" onClick={toggle} aria-expanded={open}>
+        <h2 className="pg-title"><Trophy size={17} /> {tr('recordsTitle')}</h2>
+        {count > 0 && <span className="pg-count">{count}</span>}
+        <span className="pg-collapse-icon" aria-label={open ? tr('recordsHide') : tr('recordsShow')}>
+          {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </span>
+      </button>
+      {open && (
+        <>
+          <p className="pg-sub">{tr('recordsIntro')}</p>
+          <RecordsList lifts={lifts} />
+        </>
+      )}
+    </section>
+  );
+}
+
 function RecordsList({ lifts }) {
   const [open, setOpen] = useState(null);
   const lang = getLang();
@@ -129,6 +179,7 @@ function RecordsList({ lifts }) {
             </button>
             {isOpen && (
               <div className="pg-record-chart">
+                <OneRMInfo bests={it.bests} bodyweight={bodyweight} />
                 <ProgressChart series={it.series} unit={bodyweight ? 'reps' : 'kg'} ariaLabel={tr('chartAria', { name: it.name })} />
                 <p className="pg-record-meta">{trn('sessionsCount', it.series.length)}</p>
               </div>
@@ -282,11 +333,7 @@ export default function ProgressTab({
         <HistoryCalendar history={history} onDelete={onDeleteEntry} onShare={onShareEntry} />
       </section>
 
-      <section className="pg-card">
-        <h2 className="pg-title"><Trophy size={17} /> {tr('recordsTitle')}</h2>
-        <p className="pg-sub">{tr('recordsIntro')}</p>
-        <RecordsList lifts={lifts} />
-      </section>
+      <RecordsSection lifts={lifts} />
 
       <BuddiesSection {...buddyProps} />
     </div>

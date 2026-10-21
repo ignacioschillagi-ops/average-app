@@ -264,8 +264,6 @@ const STRINGS = {
     confirmResetWeek: '¿Reiniciar el entrenamiento de esta semana? Se van a desmarcar todos los ejercicios.',
     confirmSwitchCode: 'Vas a cambiar a otro código. Lo que tenés en "{current}" va a quedar guardado ahí tal cual, y este dispositivo va a mostrar los datos de "{code}" a partir de ahora. ¿Continuar?',
     confirmPasteNoCode: 'Todavía no tenés un código propio — si pegás uno ajeno, vas a perder lo que tenés cargado en este dispositivo (no está guardado en ningún lado). ¿Continuar igual?',
-    confirmUnsavedExercise: 'Tenés un ejercicio sin confirmar (sin tildar). Si guardás ahora, ese cambio se va a aplicar igual. ¿Guardar todos los cambios?',
-    confirmSaveAll: '¿Guardar todos los cambios de esta edición?',
 
     profileTitle: 'Tu perfil',
     profileSubtitle: 'Estos datos los usa Joe\'s para darte consejos más precisos.',
@@ -482,8 +480,6 @@ const STRINGS = {
     confirmResetWeek: "Reset this week's training? All exercises will be unchecked.",
     confirmSwitchCode: 'You\'re switching to another code. What you have in "{current}" stays saved there as it is, and this device will show the data from "{code}" from now on. Continue?',
     confirmPasteNoCode: "You don't have your own code yet. If you paste someone else's, you'll lose what's on this device (it isn't saved anywhere). Continue anyway?",
-    confirmUnsavedExercise: "You have an exercise you haven't confirmed (not ticked). If you save now, that change will be applied anyway. Save all changes?",
-    confirmSaveAll: 'Save all the changes from this edit?',
 
     profileTitle: 'Your profile',
     profileSubtitle: "Joe's uses this info to give you more precise advice.",
@@ -700,8 +696,6 @@ const STRINGS = {
     confirmResetWeek: "Azzerare l'allenamento di questa settimana? Tutti gli esercizi verranno deselezionati.",
     confirmSwitchCode: 'Stai per passare a un altro codice. Quello che hai in "{current}" resta salvato lì così com\'è, e da ora questo dispositivo mostrerà i dati di "{code}". Continuare?',
     confirmPasteNoCode: 'Non hai ancora un codice tuo: se incolli quello di qualcun altro, perderai quello che hai su questo dispositivo (non è salvato da nessuna parte). Continuare comunque?',
-    confirmUnsavedExercise: 'Hai un esercizio non confermato (senza spunta). Se salvi ora, quella modifica verrà applicata comunque. Salvare tutte le modifiche?',
-    confirmSaveAll: 'Salvare tutte le modifiche di questa sessione?',
 
     profileTitle: 'Il tuo profilo',
     profileSubtitle: "Joe's usa questi dati per darti consigli più precisi.",

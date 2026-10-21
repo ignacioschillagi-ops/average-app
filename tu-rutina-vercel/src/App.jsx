@@ -31,6 +31,7 @@ import { drawStoryCard, drawDetailCard } from './lib/storyCard';
 import StoryPicker from './components/StoryPicker';
 import { coachNudgeFor } from './lib/coach';
 import ExerciseSheet from './components/ExerciseSheet';
+import ExerciseEditor from './components/ExerciseEditor';
 import ProgressTab from './components/ProgressTab';
 import { entryExercises } from './components/HistoryCalendar';
 import {
@@ -580,8 +581,9 @@ const rolloverData = (data, now = Date.now()) => {
   let variants = data.variants.map((v) => ({
     ...v,
     days: (v.days || []).map((d) => {
-      const list = (d.list || []).map((e) => revertTodaySwap(e, today));
-      if (list.some((e, i) => e !== d.list[i])) { changed = true; return { ...d, list }; }
+      const kept = (d.list || []).filter((e) => !e.tempDate || e.tempDate === today);
+      const list = kept.map((e) => revertTodaySwap(e, today));
+      if (kept.length !== (d.list || []).length || list.some((e, i) => e !== kept[i])) { changed = true; return { ...d, list }; }
       return d;
     }),
   }));
@@ -1286,92 +1288,57 @@ function ConfirmDialog({ state, onCancel, onConfirm }) {
 
 // ---------- Ejercicio ----------
 
-function ExerciseRow({ exercise, info, editMode, saveSignal, onUpdate, onDelete, onToggleDone, onOpen, setNodeRef, onHandlePointerDown, isDragging, isOver }) {
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(exercise.name);
-  const [sets, setSets] = useState(exercise.sets);
-  const [weight, setWeight] = useState(exercise.weight || '');
+function ExerciseRow({ exercise, info, editMode, onToggleDone, onOpen, onEdit, setNodeRef, onHandlePointerDown, isDragging, isOver }) {
+  const stateClass = `${isDragging ? 'ex-row-dragging' : ''} ${isOver ? 'ex-row-over' : ''}`;
+  const tempTag = exercise.tempDate ? <span className="ex-temp-tag">{tr('tempTag')}</span> : null;
 
-  const save = () => {
-    onUpdate({ ...exercise, name: name.trim() || exercise.name, sets: sets.trim() || exercise.sets, weight: weight.trim() });
-    setEditing(false);
-  };
-
-  // Si tocás el botón global de guardar mientras esta fila todavía está en edición
-  // (sin haber tocado el tilde), igual aplicamos el cambio pendiente en vez de perderlo.
-  useEffect(() => {
-    if (editing) save();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saveSignal]);
-
-  if (editing) {
+  // Editando: se arrastra desde la manija y se toca la fila para cambiarla o borrarla.
+  if (editMode) {
     return (
-      <div className="ex-row ex-row-editing">
-        <input className="ex-input ex-input-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={tr('exercisePlaceholder')} autoFocus />
-        <input className="ex-input ex-input-sets" value={sets} onChange={(e) => setSets(e.target.value)} placeholder="4x10" />
-        <input
-          className="ex-input ex-input-weight"
-          value={weight}
-          onChange={(e) => setWeight(e.target.value)}
-          placeholder="kg"
-          inputMode="decimal"
-        />
-        <button className="icon-btn confirm" onClick={save} aria-label={tr('save')}><Check size={15} /></button>
+      <div ref={setNodeRef} className={`ex-row ex-row-edit ${stateClass}`}>
+        <span className="drag-handle" aria-label={tr('dragToReorder')} onPointerDown={onHandlePointerDown}>
+          <GripVertical size={16} />
+        </span>
+        <button type="button" className="ex-edit-open" onClick={onEdit} aria-label={tr('editExerciseAria', { name: exercise.name })}>
+          <span className="ex-name">{exercise.name}{tempTag}</span>
+          <span className="ex-meta">
+            <span className="ex-sets">{exercise.sets}</span>
+            {exercise.weight && <span className="ex-weight">{exercise.weight} kg</span>}
+            <Pencil size={14} className="ex-chevron" />
+          </span>
+        </button>
       </div>
     );
   }
 
-  const stateClass = `${isDragging ? 'ex-row-dragging' : ''} ${isOver ? 'ex-row-over' : ''}`;
-
   return (
-    <div
-      ref={editMode ? setNodeRef : undefined}
-      className={`ex-row ${exercise.done ? 'ex-row-done' : ''} ${!editMode ? 'ex-row-view' : ''} ${stateClass}`}
-    >
-      {editMode && (
-        <span className="drag-handle" aria-hidden="true" onPointerDown={onHandlePointerDown}>
-          <GripVertical size={14} />
-        </span>
-      )}
-      {!editMode && (
-        <button
-          className={`done-toggle ${exercise.done ? 'checked' : ''}`}
-          onClick={onToggleDone}
-          aria-label={exercise.done ? tr('markNotDone') : tr('markDone')}
-        >
-          {exercise.done && <Check size={13} strokeWidth={3} />}
-        </button>
-      )}
-      {!editMode ? (
-        <button type="button" className="ex-open" onClick={onOpen} aria-label={tr('openExercise', { name: exercise.name })}>
-          <span className="ex-open-text">
-            <span className="ex-name">
-              {exercise.name}
-              {exercise.swappedFrom && <ArrowLeftRight size={11} className="ex-swap-icon" aria-label={tr('swappedTag')} />}
+    <div className={`ex-row ex-row-view ${exercise.done ? 'ex-row-done' : ''}`}>
+      <button
+        className={`done-toggle ${exercise.done ? 'checked' : ''}`}
+        onClick={onToggleDone}
+        aria-label={exercise.done ? tr('markNotDone') : tr('markDone')}
+      >
+        {exercise.done && <Check size={13} strokeWidth={3} />}
+      </button>
+      <button type="button" className="ex-open" onClick={onOpen} aria-label={tr('openExercise', { name: exercise.name })}>
+        <span className="ex-open-text">
+          <span className="ex-name">
+            {exercise.name}
+            {exercise.swappedFrom && <ArrowLeftRight size={11} className="ex-swap-icon" aria-label={tr('swappedTag')} />}
+          </span>
+          {(tempTag || info) && (
+            <span className="ex-subline">
+              {tempTag}
+              {info && <span className={`ex-sub ex-sub-${info.kind}`}>{info.text}</span>}
             </span>
-            {info && <span className={`ex-sub ex-sub-${info.kind}`}>{info.text}</span>}
-          </span>
-          <span className="ex-meta">
-            <span className="ex-sets">{exercise.sets}</span>
-            {exercise.weight && !info && <span className="ex-weight">{exercise.weight} kg</span>}
-            <ChevronRight size={15} className="ex-chevron" />
-          </span>
-        </button>
-      ) : (
-        <>
-          <span className="ex-name">{exercise.name}</span>
-          <span className="ex-meta">
-            <span className="ex-sets">{exercise.sets}</span>
-            {exercise.weight && <span className="ex-weight">{exercise.weight} kg</span>}
-          </span>
-        </>
-      )}
-      {editMode && (
-        <>
-          <button className="icon-btn" onClick={() => setEditing(true)} aria-label={tr('edit')}><Pencil size={13} /></button>
-          <button className="icon-btn danger" onClick={onDelete} aria-label={tr('delete')}><Trash2 size={13} /></button>
-        </>
-      )}
+          )}
+        </span>
+        <span className="ex-meta">
+          <span className="ex-sets">{exercise.sets}</span>
+          {exercise.weight && !info && <span className="ex-weight">{exercise.weight} kg</span>}
+          <ChevronRight size={15} className="ex-chevron" />
+        </span>
+      </button>
     </div>
   );
 }
@@ -1394,11 +1361,10 @@ const exerciseInfo = (e, lifts) => {
   return null;
 };
 
-function DayCard({ day: d, lifts, editMode, saveSignal, onUpdateDay, onDeleteDay, onWeekdayChange, onOpenExercise, onShareDay, requestConfirm, usedWeekdays, usedPhrases, setNodeRef, justMoved }) {
+function DayCard({ day: d, lifts, editMode, onUpdateDay, onDeleteDay, onWeekdayChange, onOpenExercise, onAddExercise, onEditExercise, onShareDay, requestConfirm, usedWeekdays, usedPhrases, setNodeRef, justMoved }) {
   const [collapsed, setCollapsed] = useState(false);
-  const [addingName, setAddingName] = useState('');
-  const [addingSets, setAddingSets] = useState('');
-  const [addingWeight, setAddingWeight] = useState('');
+  // Borrador del nombre del día: deja borrarlo entero para escribir otro (antes volvía a aparecer el de siempre).
+  const [nameDraft, setNameDraft] = useState(null);
   const [weekdayMenuOpen, setWeekdayMenuOpen] = useState(false);
   const exNodesRef = useRef({});
   const dragExRef = useRef(null);
@@ -1423,29 +1389,18 @@ function DayCard({ day: d, lifts, editMode, saveSignal, onUpdateDay, onDeleteDay
 
   const setList = (next) => onUpdateDay({ ...d, list: next });
 
-  const updateExercise = (idx, updated) => {
-    const next = [...list];
-    next[idx] = updated;
-    setList(next);
-  };
-
   const toggleDone = (idx) => {
     const next = [...list];
     next[idx] = { ...next[idx], done: !next[idx].done };
     setList(next);
   };
 
-  const deleteExercise = (idx) => {
-    requestConfirm(tr('confirmDeleteExercise', { name: list[idx].name }), () => setList(list.filter((_, i) => i !== idx)));
-  };
-
-  const addExercise = () => {
-    if (!addingName.trim()) return;
-    setList([...list, { ...ex(addingName.trim(), addingSets.trim() || '—'), weight: addingWeight.trim() }]);
-    setAddingName('');
-    setAddingSets('');
-    setAddingWeight('');
-  };
+  // Al completar el día se apaga el descanso que esté corriendo (el entrenamiento terminó).
+  const wasCompleteRef = useRef(isComplete);
+  useEffect(() => {
+    if (isComplete && !wasCompleteRef.current && !editMode && restTimer.get().running) restTimer.stop();
+    wasCompleteRef.current = isComplete;
+  }, [isComplete, editMode]);
 
   const onExPointerDown = makePointerReorder({
     nodesRef: exNodesRef,
@@ -1465,11 +1420,12 @@ function DayCard({ day: d, lifts, editMode, saveSignal, onUpdateDay, onDeleteDay
         <div className="day-header-left">
           <div className="weekday-wrap">
             <button
-              className={`focus-chip ${!editMode ? 'static' : ''}`}
+              className={`focus-chip ${!editMode ? 'static' : 'focus-chip-edit'}`}
               onClick={() => editMode && setWeekdayMenuOpen((o) => !o)}
               aria-label={editMode ? tr('chooseWeekday') : undefined}
             >
               {weekdayLabel(d.weekday, getLang())}
+              {editMode && <ChevronDown size={12} />}
             </button>
             {editMode && weekdayMenuOpen && (
               <>
@@ -1493,9 +1449,16 @@ function DayCard({ day: d, lifts, editMode, saveSignal, onUpdateDay, onDeleteDay
             {editMode ? (
               <input
                 className="day-name-input"
-                value={tagLabel}
-                onChange={(e) => onUpdateDay({ ...d, tagLabel: e.target.value })}
+                value={nameDraft != null ? nameDraft : tagLabel}
+                onFocus={() => setNameDraft(tagLabel)}
+                onChange={(e) => {
+                  setNameDraft(e.target.value);
+                  if (e.target.value.trim()) onUpdateDay({ ...d, tagLabel: e.target.value });
+                }}
+                onBlur={() => setNameDraft(null)}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                 placeholder={tr('focusPlaceholder')}
+                enterKeyHint="done"
               />
             ) : (
               <span className="day-name-static">{tagLabel}</span>
@@ -1528,10 +1491,8 @@ function DayCard({ day: d, lifts, editMode, saveSignal, onUpdateDay, onDeleteDay
                 exercise={exercise}
                 info={editMode ? null : exerciseInfo(exercise, lifts)}
                 onOpen={() => onOpenExercise(exercise.id)}
+                onEdit={() => onEditExercise(exercise.id)}
                 editMode={editMode}
-                saveSignal={saveSignal}
-                onUpdate={(u) => updateExercise(idx, u)}
-                onDelete={() => deleteExercise(idx)}
                 onToggleDone={() => toggleDone(idx)}
                 setNodeRef={(node) => {
                   if (node) exNodesRef.current[String(idx)] = node;
@@ -1543,33 +1504,9 @@ function DayCard({ day: d, lifts, editMode, saveSignal, onUpdateDay, onDeleteDay
               />
             ))}
           </div>
-          {editMode && (
-            <div className="add-row">
-              <input
-                className="ex-input ex-input-name"
-                placeholder={tr('newExercisePlaceholder')}
-                value={addingName}
-                onChange={(e) => setAddingName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addExercise()}
-              />
-              <input
-                className="ex-input ex-input-sets"
-                placeholder={tr('setsRepsPlaceholder')}
-                value={addingSets}
-                onChange={(e) => setAddingSets(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addExercise()}
-              />
-              <input
-                className="ex-input ex-input-weight"
-                placeholder="kg"
-                inputMode="decimal"
-                value={addingWeight}
-                onChange={(e) => setAddingWeight(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addExercise()}
-              />
-              <button className="icon-btn add-btn" onClick={addExercise} aria-label={tr('add')}><Plus size={15} /></button>
-            </div>
-          )}
+          <button type="button" className={`add-ex-btn ${editMode ? 'add-ex-btn-edit' : ''}`} onClick={onAddExercise}>
+            <Plus size={15} /> {tr('addExerciseRow')}
+          </button>
           {isComplete && (
             <div className="day-congrats">
               <CheckCircle2 size={15} />
@@ -1640,16 +1577,18 @@ function VariantTab({ variant, active, editMode, canDelete, onSelect, onRename, 
 // ---------- Cronómetro flotante ----------
 
 
-// ---------- Burbujas flotantes de edición (guardar / deshacer) ----------
+// ---------- Barra de edición (deshacer / listo) ----------
+// Fija arriba de la barra de navegación mientras se edita. Los cambios se guardan solos.
 
-function EditFloatingControls({ onSave, onUndo, canUndo }) {
+function EditBar({ onDone, onUndo, canUndo }) {
   return (
-    <div className="edit-fab-wrap">
-      <button className="edit-fab-btn edit-fab-undo" onClick={onUndo} disabled={!canUndo} aria-label={tr('undoLast')}>
-        <Undo2 size={18} />
+    <div className="edit-bar" role="toolbar" aria-label={tr('editingRoutine')}>
+      <span className="edit-bar-label"><Pencil size={14} /> {tr('editingRoutine')}</span>
+      <button type="button" className="edit-bar-btn" onClick={onUndo} disabled={!canUndo}>
+        <Undo2 size={16} /> {tr('undo')}
       </button>
-      <button className="edit-fab-btn edit-fab-save" onClick={onSave} aria-label={tr('saveAndExit')}>
-        <Save size={20} />
+      <button type="button" className="edit-bar-btn edit-bar-done" onClick={onDone}>
+        <Check size={16} strokeWidth={3} /> {tr('done')}
       </button>
     </div>
   );
@@ -2114,13 +2053,13 @@ export default function GymRoutineApp() {
   const [needsTemplate, setNeedsTemplate] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
-  const [saveSignal, setSaveSignal] = useState(0);
   const undoStackRef = useRef([]);
   const prevDataRef = useRef(null);
   const isUndoingRef = useRef(false);
   const [showTemplateBrowser, setShowTemplateBrowser] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [openEx, setOpenEx] = useState(null); // { dayId, exId }
+  const [exEditor, setExEditor] = useState(null); // { dayId, mode: 'add' | 'edit', exId }
   const [toast, setToast] = useState(null);
   const [storyPicker, setStoryPicker] = useState(null);
   const toastTimerRef = useRef(null);
@@ -2405,11 +2344,32 @@ export default function GymRoutineApp() {
   }, [apiKey, apiKeyLoaded]);
 
   useEffect(() => {
+    if (!chatLoaded) return undefined;
     const t = setTimeout(() => {
       storage.set(CHAT_STORAGE, JSON.stringify(chatMessages.slice(-40))).catch(() => {});
     }, 400);
     return () => clearTimeout(t);
-  }, [chatMessages]);
+  }, [chatMessages, chatLoaded]);
+
+  // Si la app pasa a segundo plano o se cierra justo después de un cambio, se guarda ya
+  // (sin esperar el medio segundo de siempre): así no se pierde la última serie ni lo leído.
+  const flushRef = useRef(null);
+  flushRef.current = () => {
+    try {
+      if (loaded && data) localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      if (chatLoaded) localStorage.setItem(CHAT_STORAGE, JSON.stringify(chatMessages.slice(-40)));
+    } catch (e) { /* sin espacio o sin permiso: queda el guardado normal */ }
+  };
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') flushRef.current(); };
+    const onPageHide = () => flushRef.current();
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', onPageHide);
+    };
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -3245,25 +3205,45 @@ export default function GymRoutineApp() {
     setCanUndo(undoStackRef.current.length > 0);
   };
 
-  const handleSaveEdits = () => {
-    setSaveSignal((s) => s + 1);
+  // Los cambios se aplican en el momento; "Listo" solo sale del modo edición.
+  const finishEditing = () => {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     undoStackRef.current = [];
     setCanUndo(false);
     setEditMode(false);
   };
 
-  const handleSaveClick = () => {
-    const hasOpenEdits = typeof document !== 'undefined' && document.querySelectorAll('.ex-row-editing').length > 0;
-    if (!canUndo && !hasOpenEdits) {
-      handleSaveEdits();
-      return;
+  // ----- Agregar / editar un ejercicio (hoja)
+  const editorDay = exEditor ? activeDays.find((d) => d.id === exEditor.dayId) : null;
+  const editorExercise = editorDay && exEditor.exId ? editorDay.list.find((e) => e.id === exEditor.exId) : null;
+  const todayWeekdayKey = WEEK_DAYS[(new Date().getDay() + 6) % 7];
+  const saveExerciseEditor = ({ name, sets, weight, temp }) => {
+    if (!editorDay) { setExEditor(null); return; }
+    if (exEditor.mode === 'add') {
+      const added = { ...ex(name, sets), weight, ...(temp ? { tempDate: localDateKey(Date.now()) } : {}) };
+      updateDay(editorDay.id, { ...editorDay, list: [...editorDay.list, added] });
+      showToast(tr(temp ? 'addedTodayToast' : 'addedToast', { name }));
+    } else if (editorExercise) {
+      updateDay(editorDay.id, {
+        ...editorDay,
+        // Editar es un cambio a propósito: si estaba cambiado "solo por hoy", queda así para siempre.
+        list: editorDay.list.map((e) => {
+          if (e.id !== editorExercise.id) return e;
+          const { swappedFrom, ...rest } = e;
+          return { ...rest, name, sets, weight };
+        }),
+      });
     }
-    const message = hasOpenEdits ? tr('confirmUnsavedExercise') : tr('confirmSaveAll');
-    requestConfirm(message, handleSaveEdits, { confirmLabel: tr('save'), variant: 'save' });
+    setExEditor(null);
+  };
+  const deleteEditorExercise = () => {
+    if (!editorDay || !editorExercise) { setExEditor(null); return; }
+    updateDay(editorDay.id, { ...editorDay, list: editorDay.list.filter((e) => e.id !== editorExercise.id) });
+    setExEditor(null);
   };
 
   return (
-    <div className="app-root app-root-with-nav">
+    <div className={`app-root app-root-with-nav ${editMode && activeTab === 'routines' ? 'app-root-editing' : ''}`}>
       <style>{styles}</style>
 
       <div
@@ -3292,6 +3272,7 @@ export default function GymRoutineApp() {
                       onClick={() => editMode && (setTitleDraft(getDisplayTitle(data)), setEditingTitle(true))}
                     >
                       {getDisplayTitle(data)}
+                      {editMode && <Pencil size={15} className="title-edit-icon" aria-hidden="true" />}
                     </h1>
                   )}
                 </div>
@@ -3427,7 +3408,8 @@ export default function GymRoutineApp() {
                     onOpenExercise={(exId) => openExerciseSheet(d.id, exId)}
                     onShareDay={() => shareDayStory(d)}
                     editMode={editMode}
-                    saveSignal={saveSignal}
+                    onAddExercise={() => setExEditor({ dayId: d.id, mode: 'add' })}
+                    onEditExercise={(exId) => setExEditor({ dayId: d.id, mode: 'edit', exId })}
                     onUpdateDay={(u) => updateDay(d.id, u)}
                     onDeleteDay={() => deleteDay(d.id)}
                     onWeekdayChange={(wd) => setDayWeekday(d.id, wd)}
@@ -3627,10 +3609,10 @@ export default function GymRoutineApp() {
 
       {activeTab === 'profile' && <BrandFooter />}
 
-      {!editMode && !openExercise && !storyPicker && <FloatingTimer raised={activeTab === 'chat'} />}
+      {!editMode && !openExercise && !storyPicker && !exEditor && <FloatingTimer raised={activeTab === 'chat'} />}
 
       {editMode && activeTab === 'routines' && (
-        <EditFloatingControls onSave={handleSaveClick} onUndo={handleUndo} canUndo={canUndo} />
+        <EditBar onDone={finishEditing} onUndo={handleUndo} canUndo={canUndo} />
       )}
 
       <BottomNav activeTab={activeTab} onChange={setActiveTab} chatUnread={hasUnreadChat} />
@@ -3645,11 +3627,28 @@ export default function GymRoutineApp() {
 
       {showPrivacyPolicy && <PrivacyPolicyOverlay onClose={() => setShowPrivacyPolicy(false)} />}
 
+      {exEditor && editorDay && (exEditor.mode === 'add' || editorExercise) && (
+        <ExerciseEditor
+          key={`${exEditor.dayId}-${exEditor.exId || 'new'}`}
+          mode={exEditor.mode}
+          initial={editorExercise || null}
+          dayLabel={`${weekdayLabel(editorDay.weekday, lang)} · ${editorDay.tagLabel || ''}`}
+          accent={(FOCUS_COLORS[editorDay.focusKey] || FOCUS_COLORS.comodin).accent}
+          allowTemp={exEditor.mode === 'add' && !editMode}
+          defaultTemp={editorDay.weekday === todayWeekdayKey}
+          existingNames={editorDay.list.map((e) => e.name)}
+          onSave={saveExerciseEditor}
+          onDelete={deleteEditorExercise}
+          onClose={() => setExEditor(null)}
+        />
+      )}
+
       {openExercise && (
         <ExerciseSheet
           key={`${openExercise.id}-${openExercise.name}`}
           exercise={openExercise}
           lifts={data.lifts || {}}
+          othersDone={openDay.list.filter((e) => e.id !== openExercise.id).every((e) => e.done)}
           accent={(FOCUS_COLORS[openDay.focusKey] || FOCUS_COLORS.comodin).accent}
           onChange={changeOpenExercise}
           onSwap={swapOpenExercise}
@@ -3687,6 +3686,7 @@ const styles = `
 @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap');
 
 * { box-sizing: border-box; }
+button, a, input { -webkit-tap-highlight-color: transparent; }
 html, body { overflow-x: clip; }
 
 .app-root {
@@ -4220,6 +4220,8 @@ html, body { overflow-x: clip; }
 .focus-chip:hover { border-color: var(--accent); }
 .focus-chip.static { cursor: default; }
 .focus-chip.static:hover { border-color: transparent; }
+.focus-chip-edit { display: inline-flex; align-items: center; gap: 4px; border: 1px dashed var(--accent); }
+.title-edit-icon { margin-left: 8px; color: #8E8D88; vertical-align: -1px; }
 
 .day-titles { min-width: 0; flex: 1; }
 
@@ -4236,6 +4238,7 @@ html, body { overflow-x: clip; }
   border-bottom: 1px solid transparent;
 }
 .day-name-input:focus { border-bottom: 1px solid var(--accent); }
+.day-card-editing .day-name-input { border-bottom: 1px dashed #3A3B3F; padding-bottom: 2px; }
 
 .day-name-static {
   font-family: 'Oswald', sans-serif;
@@ -4260,7 +4263,6 @@ html, body { overflow-x: clip; }
 }
 .ex-row:hover { background: #212226; }
 .ex-row:active { cursor: grabbing; }
-.ex-row-editing { background: #212226; grid-template-columns: minmax(0, 1fr) auto auto auto; cursor: default; }
 .ex-row-view { grid-template-columns: auto minmax(0, 1fr) auto; cursor: default; }
 .ex-row-view:hover { background: transparent; }
 
@@ -4318,24 +4320,6 @@ html, body { overflow-x: clip; }
 .icon-btn.confirm:hover { color: #6FAE7A; background: rgba(111,174,122,0.12); }
 .icon-btn.add-btn { color: var(--accent); }
 .icon-btn.add-btn:hover { background: var(--accent-bg); }
-
-.ex-input {
-  background: #17181B; border: 1px solid #2E2F33; color: #EDEAE3; border-radius: 5px; padding: 6px 8px;
-  font-size: 13px; font-family: 'Inter', sans-serif; outline: none; width: 100%; min-width: 0;
-}
-.ex-input:focus { border-color: var(--accent); }
-.ex-input-sets { width: 100px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; }
-.ex-input-weight { width: 64px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; }
-
-.add-row {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 8px; margin-top: 10px; padding-top: 10px;
-  border-top: 1px dashed #2A2B2F;
-}
-@media (max-width: 380px) {
-  .add-row { gap: 6px; }
-  .add-row .ex-input-sets { width: 78px; }
-  .add-row .ex-input-weight { width: 50px; }
-}
 
 .empty-hint { font-size: 12.5px; color: #6B6A65; font-style: italic; padding: 6px; }
 
@@ -4427,37 +4411,40 @@ html, body { overflow-x: clip; }
 .confirm-btn.save:hover { background: #7FBD8A; }
 
 /* Cronómetro flotante */
-/* Burbujas flotantes de edición (guardar / deshacer) */
-.edit-fab-wrap {
+/* Barra de edición: deshacer / listo, fija arriba de la navegación */
+.edit-bar {
   position: fixed;
-  bottom: calc(78px + env(safe-area-inset-bottom));
-  right: 20px;
-  z-index: 45;
+  left: 12px;
+  right: 12px;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  z-index: 56;
+  max-width: 560px;
+  margin: 0 auto;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 14px;
+  background: #232427;
+  border: 1px solid #3A3B3F;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+  animation: xs-up 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-
-.edit-fab-btn {
-  width: 52px;
-  height: 52px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  cursor: pointer;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
-  transition: transform 0.15s ease, opacity 0.15s ease;
+.edit-bar-label {
+  display: flex; align-items: center; gap: 6px; margin-right: auto; min-width: 0;
+  font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px; letter-spacing: 0.03em; text-transform: uppercase; color: #EDEAE3;
 }
-.edit-fab-btn:hover { transform: scale(1.05); }
-
-.edit-fab-save { background: #6FAE7A; color: #17181B; }
-.edit-fab-save:hover { background: #7FBD8A; }
-
-.edit-fab-undo { background: #2B2D33; color: #EDEAE3; border: 1px solid #454750; }
-.edit-fab-undo:hover:not(:disabled) { border-color: #B33A3A; }
-.edit-fab-undo:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+.edit-bar-label svg { color: #B33A3A; flex-shrink: 0; }
+.edit-bar-btn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 42px; padding: 0 14px;
+  border-radius: 10px; border: 1px solid #3A3B3F; background: #1C1D20; color: #EDEAE3;
+  font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.edit-bar-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.edit-bar-done { background: #6FAE7A; border-color: #6FAE7A; color: #17181B; }
+.edit-bar-done:hover { background: #7FBD8A; }
+@media (max-width: 360px) { .edit-bar-label { display: none; } .edit-bar { justify-content: flex-end; } }
+.app-root-editing { padding-bottom: 170px; }
 
 .timer-wrap {
   position: fixed;
@@ -4494,7 +4481,11 @@ html, body { overflow-x: clip; }
   font-weight: 600;
   white-space: nowrap;
 }
-.timer-fab-alert { animation: timer-pulse 0.4s ease 3; }
+.timer-fab.timer-fab-alert { background: #4E8A5A; animation: timer-pulse-green 1s ease infinite; }
+@keyframes timer-pulse-green {
+  0%, 100% { box-shadow: 0 6px 18px rgba(0,0,0,0.4); }
+  50% { box-shadow: 0 0 0 12px rgba(111,174,122,0.35); }
+}
 @keyframes timer-pulse {
   0%, 100% { box-shadow: 0 6px 18px rgba(0,0,0,0.4); }
   50% { box-shadow: 0 0 0 10px rgba(179,58,58,0.35); }
@@ -5032,7 +5023,7 @@ html, body { overflow-x: clip; }
 }
 
 /* ===================== Registro por serie / hoja de ejercicio ===================== */
-.ex-row-view { grid-template-columns: auto 1fr; padding: 6px 4px 6px 6px; }
+.ex-row-view { grid-template-columns: auto minmax(0, 1fr); padding: 6px 4px 6px 6px; }
 .ex-row-view .done-toggle { width: 22px; height: 22px; border-radius: 6px; }
 .ex-open {
   display: grid;
@@ -5059,6 +5050,128 @@ html, body { overflow-x: clip; }
 .ex-sub-session { color: var(--accent); }
 .ex-row-done .ex-sub { opacity: 0.7; }
 .ex-chevron { color: #4A4B4F; flex-shrink: 0; }
+
+/* Fila en modo edición: manija + toda la fila se toca para editar */
+.ex-row.ex-row-edit { grid-template-columns: auto minmax(0, 1fr); gap: 2px; padding: 2px 2px 2px 0; cursor: default; }
+.ex-row-edit .drag-handle { padding: 12px 8px; margin: 0; color: #6B6A65; }
+.ex-edit-open {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-width: 0; min-height: 48px;
+  padding: 8px 8px 8px 4px; background: none; border: none; border-radius: 8px; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.ex-edit-open:hover, .ex-edit-open:active { background: #25262A; }
+.ex-edit-open .ex-chevron { color: #8E8D88; }
+.ex-temp-tag {
+  display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; vertical-align: 1px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase;
+  color: #B08D57; background: rgba(176,141,87,0.14); white-space: nowrap;
+}
+.ex-row-done .ex-temp-tag { opacity: 0.6; }
+.ex-subline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.ex-subline .ex-temp-tag { margin-left: 0; }
+
+/* Agregar ejercicio al día */
+.add-ex-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 42px; margin-top: 8px;
+  border-radius: 10px; border: 1px dashed #34353A; background: none; color: #8E8D88;
+  font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: color 0.15s ease, border-color 0.15s ease;
+}
+.add-ex-btn:hover { color: var(--accent); border-color: var(--accent); }
+.add-ex-btn-edit { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); min-height: 46px; }
+
+/* Barrita para arrastrar la hoja hacia abajo */
+.xs-grabber-zone { margin: -8px -18px 0; padding: 8px 0 6px; cursor: grab; }
+.xs-grabber-zone .xs-grabber { margin: 2px auto 8px; width: 44px; height: 5px; }
+
+/* Campo de nombre con sugerencias */
+.xn-wrap { position: relative; }
+.xn-field { position: relative; }
+.xn-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #6B6A65; pointer-events: none; }
+.xn-input {
+  width: 100%; min-height: 46px; padding: 10px 12px 10px 36px; border-radius: 10px; border: 1px solid #3A3B3F;
+  background: #17181B; color: #EDEAE3; font-size: 16px; font-family: 'Inter', sans-serif; outline: none;
+}
+.xn-input:focus { border-color: var(--accent, #B33A3A); }
+.xn-list { list-style: none; margin: 6px 0 0; padding: 4px; border-radius: 10px; border: 1px solid #3A3B3F; background: #232427; max-height: 236px; overflow-y: auto; }
+.xn-option {
+  display: block; width: 100%; min-height: 40px; padding: 9px 10px; text-align: left; background: none; border: none; border-radius: 7px;
+  color: #EDEAE3; font-size: 14.5px; font-family: inherit; cursor: pointer;
+}
+.xn-option:hover, .xn-option:active { background: rgba(255,255,255,0.06); }
+
+/* Hoja para agregar / editar un ejercicio */
+.xe-field { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; min-width: 0; }
+.xe-field.is-shake { animation: xs-shake 0.4s ease; }
+.xe-label { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #8E8D88; }
+.xe-row { display: grid; grid-template-columns: minmax(0, 1fr) 118px; gap: 10px; align-items: end; }
+.xe-input {
+  width: 100%; min-width: 0; min-height: 46px; padding: 10px 12px; border-radius: 10px; border: 1px solid #3A3B3F;
+  background: #17181B; color: #EDEAE3; font-size: 16px; font-family: 'Inter', sans-serif; outline: none;
+}
+.xe-input:focus { border-color: var(--accent); }
+.xe-mono { font-family: 'JetBrains Mono', monospace; }
+.xe-chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 2px; scrollbar-width: none; }
+.xe-chips::-webkit-scrollbar { display: none; }
+.xe-chip {
+  flex-shrink: 0; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #3A3B3F; background: #1C1D20;
+  color: #B0AFA9; font-family: 'JetBrains Mono', monospace; font-size: 13px; cursor: pointer;
+}
+.xe-chip.is-on { border-color: var(--accent); background: var(--accent); color: #fff; }
+.xe-scope { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+.xe-scope-opt {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 12px; border-radius: 12px;
+  border: 1.5px solid #34353A; background: #1C1D20; color: #8E8D88; text-align: left; font-family: inherit; cursor: pointer;
+}
+.xe-scope-opt.is-on { border-color: var(--accent); background: #212226; }
+.xe-scope-opt svg { color: #6B6A65; margin-bottom: 2px; }
+.xe-scope-opt.is-on svg { color: var(--accent); }
+.xe-scope-title { font-weight: 700; font-size: 14.5px; color: #EDEAE3; }
+.xe-scope-desc { font-size: 12px; line-height: 1.35; color: #8E8D88; }
+.xe-save { width: 100%; min-height: 48px; margin-top: 18px; font-size: 15px; border-radius: 12px; }
+.xe-delete {
+  display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 44px; margin-top: 8px;
+  background: none; border: none; color: #D46A6A; font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;
+}
+.xe-delete-confirm {
+  display: flex; flex-direction: column; gap: 10px; margin-top: 12px; padding: 12px; border-radius: 12px;
+  border: 1px solid rgba(212,106,106,0.4); background: rgba(212,106,106,0.08); font-size: 13.5px; line-height: 1.4; color: #EDEAE3;
+}
+.xe-delete-confirm > div { display: flex; justify-content: flex-end; gap: 8px; }
+.xs-btn.xe-danger { background: #B33A3A; border-color: #B33A3A; color: #fff; }
+
+/* Técnica con Google */
+.xs-howto-query {
+  margin: 0 0 14px; padding: 12px 14px; border-radius: 10px; background: #17181B; border: 1px solid #2E2F33;
+  font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.45; color: #EDEAE3;
+}
+.xs-howto-buttons { display: flex; flex-direction: column; gap: 8px; }
+.xs-btn.xs-btn-big { min-height: 46px; font-size: 14.5px; border-radius: 11px; }
+
+/* Cambiar: escribir uno propio */
+.xs-swap-custom { margin: 0 0 14px; padding: 12px; border-radius: 12px; background: #17181B; border: 1px solid #2E2F33; }
+.xs-swap-custom .xn-input { background: #1C1D20; }
+.xs-swap-custom-label { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 12.5px; font-weight: 600; color: #B0AFA9; }
+.xs-swap-custom-actions { margin-top: 10px; }
+.xs-swap-or { margin: 0 0 8px; font-size: 12.5px; color: #8E8D88; }
+
+/* Récords plegables y 1RM */
+.pg-collapse-head {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 0;
+  background: none; border: none; color: inherit; text-align: left; font: inherit; cursor: pointer;
+}
+.pg-collapse-head .pg-title { margin: 0; }
+.pg-count {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #B0AFA9; background: #232427;
+  border: 1px solid #2E2F33; border-radius: 999px; padding: 2px 8px;
+}
+.pg-collapse-icon { display: flex; margin-left: auto; color: #8E8D88; }
+.pg-collapsible.is-open .pg-collapse-head { margin-bottom: 6px; }
+.pg-1rm { margin: 2px 0 12px; padding: 12px; border-radius: 10px; background: #17181B; border: 1px solid #2E2F33; }
+.pg-1rm-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.pg-1rm-label { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase; color: #8E8D88; }
+.pg-1rm-value { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 24px; color: #EDEAE3; }
+.pg-1rm-text { margin: 6px 0 0; font-size: 12.5px; line-height: 1.5; color: #B0AFA9; }
+.pg-1rm-pct { margin: 6px 0 0; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8E8D88; }
+.pg-1rm-note { margin: 2px 0 10px; font-size: 12.5px; line-height: 1.45; color: #8E8D88; }
 .ex-open:hover .ex-chevron { color: #8E8D88; }
 
 .day-congrats { flex-wrap: wrap; }

@@ -56,21 +56,40 @@ Proyecto Vite + React listo para deployar en Vercel.
   hoja con cuatro vistas (Series · Progreso · Técnica · Cambiar). En Series se anotan kg y
   repeticiones de cada serie (opcional: tildar el ejercicio sin anotar sigue funcionando).
   Arriba aparece lo que hizo la vez pasada, con "Repetir" y "+2,5 kg" para no tipear; al
-  marcar una serie arranca solo el descanso. Lo anotado se guarda en `data.lifts` (por
-  ejercicio, independiente del idioma) y en el registro del historial. Lógica en
-  `src/lib/lifts.js`; la hoja en `src/components/ExerciseSheet.jsx`.
+  marcar una serie arranca solo el descanso (también en la última serie de cada ejercicio,
+  menos cuando es lo último del día: ahí se apaga). Al terminar, el aviso verde queda 5 s.
+  La hoja se cierra con la X, tocando afuera o arrastrándola hacia abajo
+  (`src/lib/useSheetDrag.js`). Lo anotado se guarda en `data.lifts` (por ejercicio,
+  independiente del idioma) y en el registro del historial. Lógica en `src/lib/lifts.js`;
+  la hoja en `src/components/ExerciseSheet.jsx`.
 - **Progreso y récords**: gráfico por ejercicio (mejor serie de cada sesión,
   `src/components/ProgressChart.jsx`) y aviso al batir un récord de peso o de repeticiones
-  (solo cuando ya hay sesiones anteriores para comparar).
-- **Técnica**: la vista Técnica busca el ejercicio en wger.de (imagen, músculos, equipo y
-  descripción, `src/lib/wger.js`), sin pasar por el chat.
+  (solo cuando ya hay sesiones anteriores para comparar). La sección de récords se pliega
+  (recuerda si la dejaste abierta) y cada récord muestra el 1RM aproximado (fórmula de
+  Epley sobre la mejor serie de hasta 12 repeticiones) con referencias al 80 % y 70 %.
+- **Técnica**: abre una búsqueda de Google ("cómo hacer … técnica correcta", o la de videos)
+  en el idioma de la app. El texto de la búsqueda está en `howToQuery` (`src/i18n-features.js`).
 - **Objetivo semanal en vez de racha diaria** (`src/lib/weekly.js`): por defecto es la
   cantidad de días de la rutina activa y se cambia en Progreso. Una semana con un día menos
   que el objetivo igual cuenta para las "semanas seguidas". **Cada lunes la rutina se
   reinicia sola** (se destildan ejercicios y series; el historial queda).
-- **Cambio rápido de ejercicio** ("Máquina ocupada" / "Estoy en casa"), sin IA: alternativas
-  por patrón de movimiento y equipo en `src/data/alternatives.js`. "Solo por hoy" vuelve
-  solo al original al día siguiente; "Reemplazar" lo cambia para siempre.
+- **Cambio rápido de ejercicio**, sin IA: se puede escribir cualquier ejercicio (con
+  sugerencias) o elegir un parecido. "Máquina ocupada" muestra solo opciones de gimnasio
+  (barra, mancuernas, máquinas, poleas, Smith, pesa rusa, barra fija, banco), primero las de
+  otro tipo de equipo; "Estoy en casa", solo peso corporal, objetos de casa o banda elástica.
+  La biblioteca (más de 220 ejercicios con equipo y traducción) está en
+  `src/data/exercise-library.js`: para sumar uno, una fila. "Solo por hoy" vuelve solo al
+  original al día siguiente; "Reemplazar" lo cambia para siempre.
+- **Agregar un ejercicio al día**: botón "Agregar ejercicio" al final de cada día, con
+  buscador, objetivo (atajos 3x10, 4x8…) y peso opcional. Fuera de edición se elige **solo
+  hoy** (desaparece solo al día siguiente; viene marcado si el día es hoy) o **para
+  siempre**. Lo de "solo hoy" no viaja en los links de rutina compartidos.
+- **Modo edición**: los cambios se aplican al instante; abajo aparece una barra con
+  Deshacer y Listo (sin diálogos). Cada ejercicio se toca para editarlo o eliminarlo en una
+  hoja grande (`src/components/ExerciseEditor.jsx`); se reordenan arrastrando la manija.
+  Editar un ejercicio cambiado "solo por hoy" lo deja así para siempre.
+- **Guardado**: además del guardado normal (medio segundo después de cada cambio), todo se
+  guarda en el momento en que la app pasa a segundo plano o se cierra.
 - **Joe's conoce tu historial**: a sus instrucciones se suma un resumen real (objetivo y
   semanas, días que más se saltean, cargas de las últimas 6 semanas, récords) armado en
   `buildHistoryContext` (`src/joe-prompt.js`). Hay botones rápidos en el chat para pedir el
@@ -107,7 +126,7 @@ Proyecto Vite + React listo para deployar en Vercel.
   necesitando conexión sí o sí es el chat con Joe's (habla en vivo con Groq o Gemini), la
   vista Técnica y los compañeros. No hace falta ningún APK ni empaquetado nativo para esto, es estándar
   de cualquier PWA instalada.
-- **Consultas de ejercicios (wger.de)**: cuando el usuario tiene dudas sobre un ejercicio,
+- **Consultas de ejercicios en el chat (wger.de)**: cuando el usuario tiene dudas sobre un ejercicio,
   Joe's puede pedirle a la app que busque en la base pública de wger.de (en español, sin
   API key) y le muestra una tarjeta con imagen, músculos, equipo y una descripción corta.
   Esto llama a `wger.de/api/v2/exercise/search/` y `wger.de/api/v2/exerciseinfo/{id}/`
@@ -207,12 +226,15 @@ vercel
     ├── joe-prompt.js     # instrucciones de Joe's (la IA) + resumen del historial
     ├── components/
     │   ├── ExerciseSheet.jsx    # hoja del ejercicio: series, progreso, técnica, cambiar
+    │   ├── ExerciseEditor.jsx   # hoja para agregar / editar un ejercicio del día
+    │   ├── ExerciseNameInput.jsx # campo con sugerencias de ejercicios
     │   ├── ProgressChart.jsx    # gráfico de un ejercicio
     │   ├── ProgressTab.jsx      # pestaña Progreso: semana, historial, récords, compañeros
     │   ├── StoryPicker.jsx      # elegir la plantilla de tarjeta para historias
     │   └── HistoryCalendar.jsx  # calendario del historial
     ├── data/
-    │   └── alternatives.js      # alternativas por patrón de movimiento y equipo
+    │   ├── exercise-library.js  # biblioteca: +220 ejercicios con equipo, patrón y traducciones
+    │   └── alternatives.js      # equivalentes para "máquina ocupada" / "en casa"
     └── lib/
         ├── coach.js      # mensaje de Joe's después de 5 días sin entrenar
         ├── dates.js      # fechas y semanas
@@ -221,5 +243,6 @@ vercel
         ├── restTimer.js  # cronómetro de descanso compartido
         ├── share.js      # links de rutina y compartir archivos
         ├── storyCard.js  # tarjeta para historias
-        └── wger.js       # búsqueda en wger.de
+        ├── useSheetDrag.js # cerrar hojas arrastrando hacia abajo
+        └── wger.js       # búsqueda en wger.de (tarjetas del chat)
 ```

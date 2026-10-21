@@ -1,103 +1,22 @@
 // Cambio rápido de ejercicio, sin IA: cada ejercicio conocido pertenece a un "patrón de
 // movimiento" (empuje horizontal, sentadilla, remo...). Los equivalentes son los otros
 // ejercicios del mismo patrón, filtrados según el motivo:
-//   - 'busy' (máquina ocupada): cualquier otro del patrón.
-//   - 'home' (estoy en casa): solo peso corporal u objetos de casa.
-// Los nombres van en español (la clave de i18n-content.js); se muestran traducidos.
-// Para sumar un equivalente: agregalo acá con su equipo y su traducción en EXERCISES.
+//   - 'busy' (máquina ocupada): solo cosas de gimnasio (barra, mancuernas, máquinas, poleas...).
+//   - 'home' (estoy en casa): solo peso corporal, objetos de casa o banda elástica.
+// La lista está en data/exercise-library.js (con equipo y traducciones).
 
 import { canonicalExerciseName, normalizeText } from '../i18n-content';
+import { LIBRARY, GYM_EQUIPMENT, HOME_EQUIPMENT } from './exercise-library';
 
-// Equipo: barbell (barra), dumbbell (mancuernas), machine (máquina), cable (polea),
-// bar (barra fija o paralelas), bodyweight (peso corporal), home (objetos de casa).
-const HOME_EQUIPMENT = ['bodyweight', 'home'];
-
-const PATTERNS = {
-  chestPress: [
-    ['Press banca barra', 'barbell'], ['Press banca plano', 'barbell'], ['Press banca con mancuernas', 'dumbbell'],
-    ['Press de pecho en máquina', 'machine'], ['Press inclinado con mancuernas', 'dumbbell'], ['Inclinado máquina', 'machine'],
-    ['Press declinado', 'barbell'], ['Fondos en paralelas', 'bar'], ['Flexiones de pecho', 'bodyweight'],
-    ['Flexiones con los pies elevados', 'bodyweight'], ['Flexiones con mochila cargada', 'home'],
-  ],
-  chestFly: [
-    ['Aperturas en polea', 'cable'], ['Cruces en polea', 'cable'], ['Aperturas con mancuernas', 'dumbbell'],
-    ['Pec deck', 'machine'], ['Flexiones abiertas', 'bodyweight'],
-  ],
-  shoulderPress: [
-    ['Press militar barra', 'barbell'], ['Press militar mancuernas', 'dumbbell'], ['Militar máquina', 'machine'],
-    ['Press Arnold', 'dumbbell'], ['Pike push-ups (hombro)', 'bodyweight'], ['Press de hombros con mochila', 'home'],
-  ],
-  lateralRaise: [
-    ['Elevaciones laterales', 'dumbbell'], ['Elevaciones laterales en polea', 'cable'],
-    ['Elevaciones laterales en máquina', 'machine'], ['Elevaciones laterales con botellas', 'home'],
-  ],
-  rearDelt: [
-    ['Face pull', 'cable'], ['Elevaciones posteriores', 'dumbbell'], ['Pájaros en máquina', 'machine'],
-    ['Y-T-W en el piso', 'bodyweight'],
-  ],
-  verticalPull: [
-    ['Dominadas', 'bar'], ['Dominadas supinas', 'bar'], ['Jalón al pecho', 'cable'], ['Jalón con agarre neutro', 'cable'],
-    ['Dorsalera libre', 'machine'], ['Pull-over', 'cable'], ['Remo invertido bajo la mesa', 'home'],
-    ['Superman con jalón', 'bodyweight'],
-  ],
-  row: [
-    ['Remo con barra', 'barbell'], ['Remo con mancuerna', 'dumbbell'], ['Remo en máquina', 'machine'],
-    ['Remo en polea baja', 'cable'], ['Remo invertido en barra baja', 'bar'], ['Remo con mochila cargada', 'home'],
-    ['Remo invertido bajo la mesa', 'home'],
-  ],
-  squat: [
-    ['Sentadilla libre', 'barbell'], ['Sentadilla frontal', 'barbell'], ['Prensa de piernas', 'machine'],
-    ['Sentadilla hack', 'machine'], ['Sentadilla goblet', 'dumbbell'], ['Sentadilla búlgara', 'dumbbell'],
-    ['Sentadillas', 'bodyweight'], ['Sentadilla a una pierna asistida', 'bodyweight'], ['Sentadilla con mochila', 'home'],
-  ],
-  hinge: [
-    ['Peso muerto convencional', 'barbell'], ['Peso muerto rumano', 'barbell'], ['Peso muerto sumo', 'barbell'],
-    ['Peso muerto rumano con mancuernas', 'dumbbell'], ['Hip thrust', 'barbell'], ['Hiperextensiones', 'machine'],
-    ['Puente de glúteo', 'bodyweight'], ['Peso muerto a una pierna', 'bodyweight'], ['Superman', 'bodyweight'],
-    ['Peso muerto con mochila', 'home'],
-  ],
-  lunge: [
-    ['Zancadas', 'bodyweight'], ['Zancadas caminando', 'bodyweight'], ['Zancadas alternadas', 'bodyweight'],
-    ['Zancadas con mancuernas', 'dumbbell'], ['Sentadilla búlgara', 'dumbbell'], ['Subidas al cajón', 'home'],
-  ],
-  quads: [
-    ['Extensión de cuádriceps', 'machine'], ['Prensa de piernas', 'machine'], ['Sentadilla sissy', 'bodyweight'],
-    ['Sentadilla isométrica contra la pared', 'home'],
-  ],
-  hamstrings: [
-    ['Curl femoral', 'machine'], ['Curl femoral en máquina', 'machine'], ['Peso muerto rumano', 'barbell'],
-    ['Peso muerto rumano con mancuernas', 'dumbbell'], ['Curl nórdico', 'bodyweight'],
-    ['Curl femoral con toalla en el piso', 'home'],
-  ],
-  calves: [
-    ['Gemelos de pie', 'machine'], ['Gemelos sentado', 'machine'], ['Elevación de talones', 'bodyweight'],
-    ['Gemelos a una pierna en escalón', 'home'],
-  ],
-  biceps: [
-    ['Curl bíceps barra', 'barbell'], ['Curl barra', 'barbell'], ['Curl martillo', 'dumbbell'],
-    ['Curl concentrado', 'dumbbell'], ['Curl en polea', 'cable'], ['Dominadas supinas', 'bar'], ['Curl con mochila', 'home'],
-  ],
-  triceps: [
-    ['Extensión de tríceps en polea', 'cable'], ['Press francés', 'barbell'],
-    ['Extensión de tríceps por encima de la cabeza', 'dumbbell'], ['Fondos en paralelas', 'bar'],
-    ['Fondos en banco', 'bodyweight'], ['Flexiones diamante', 'bodyweight'], ['Fondos en silla', 'home'],
-  ],
-  core: [
-    ['Plancha', 'bodyweight'], ['Plancha frontal', 'bodyweight'], ['Plancha lateral', 'bodyweight'],
-    ['Crunch con cable', 'cable'], ['Elevación de piernas colgado', 'bar'], ['Elevación de piernas acostado', 'bodyweight'],
-    ['Abdominales bicicleta', 'bodyweight'], ['Crunch en el piso', 'bodyweight'], ['Plancha con toque de hombro', 'bodyweight'],
-  ],
-  shrugs: [
-    ['Encogimientos', 'barbell'], ['Encogimientos con mancuernas', 'dumbbell'], ['Encogimientos con mochila', 'home'],
-  ],
-  hipAbduction: [
-    ['Abductores / aductores', 'machine'], ['Patada lateral acostado', 'bodyweight'], ['Caminata lateral con banda', 'home'],
-  ],
-  conditioning: [
-    ['Burpees', 'bodyweight'], ['Escaladores (mountain climbers)', 'bodyweight'], ['Sentadilla salto', 'bodyweight'],
-    ['Saltos de tijera', 'bodyweight'], ['Saltar la soga', 'home'],
-  ],
-};
+const PATTERNS = (() => {
+  const map = {};
+  LIBRARY.forEach(([es, , , equipment, patterns]) => {
+    (Array.isArray(patterns) ? patterns : [patterns]).forEach((pattern) => {
+      (map[pattern] = map[pattern] || []).push([es, equipment]);
+    });
+  });
+  return map;
+})();
 
 // Ejercicios de las plantillas que no están arriba con ese nombre exacto (combinados o
 // variantes), y a qué patrón corresponden.
@@ -173,18 +92,42 @@ export const movementPatternOf = (name) => {
   return hit ? hit[1] : null;
 };
 
+// Nombres distintos para el mismo ejercicio: no se sugieren entre sí ni aparecen dos veces.
+const SAME_EXERCISE = [
+  ['Press banca barra', 'Press banca plano'],
+  ['Curl bíceps barra', 'Curl barra'],
+  ['Curl femoral', 'Curl femoral en máquina'],
+  ['Plancha', 'Plancha frontal'],
+  ['Zancadas', 'Zancadas alternadas'],
+].map((group) => group.map(normalizeText));
+const sameGroupOf = (key) => SAME_EXERCISE.find((g) => g.includes(key)) || [key];
+
+const equipmentOf = (name) => {
+  const key = normalizeText(canonicalExerciseName(name) || name);
+  const row = LIBRARY.find((r) => normalizeText(r[0]) === key);
+  return row ? row[3] : null;
+};
+
 // Devuelve [{ name (español), equipment }] para mostrar como equivalentes.
+// Con "máquina ocupada" van primero los de otro tipo de equipo (si la máquina está ocupada,
+// otra máquina igual capaz también).
 export const alternativesFor = (name, reason) => {
   const pattern = movementPatternOf(name);
   if (!pattern) return [];
+  const allowed = reason === 'home' ? HOME_EQUIPMENT : GYM_EQUIPMENT;
   const self = normalizeText(canonicalExerciseName(name) || name);
-  const seen = new Set([self]);
-  return PATTERNS[pattern]
+  const own = equipmentOf(name);
+  const seen = new Set(sameGroupOf(self));
+  const list = PATTERNS[pattern]
     .filter(([altName, equipment]) => {
       const key = normalizeText(altName);
       if (seen.has(key)) return false;
-      seen.add(key);
-      return reason === 'home' ? HOME_EQUIPMENT.includes(equipment) : true;
+      sameGroupOf(key).forEach((k) => seen.add(k));
+      return allowed.includes(equipment);
     })
     .map(([altName, equipment]) => ({ name: altName, equipment }));
+  if (reason !== 'home' && own) {
+    return [...list.filter((a) => a.equipment !== own), ...list.filter((a) => a.equipment === own)];
+  }
+  return list;
 };
