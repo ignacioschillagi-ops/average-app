@@ -32,8 +32,14 @@ Proyecto Vite + React listo para deployar en Vercel.
   (ej. "4 de 6", cuáles sí y cuáles no) y el tiempo desde la primera casilla hasta la última.
   Si sigue tildando, el mismo registro se actualiza. Un ejercicio cuenta como hecho si se
   tildó o si tiene al menos una serie anotada. Se ve en un calendario mensual dentro de la
-  pestaña **Progreso** (la tarjeta "Historial de entrenamientos" de Perfil lleva directo
-  ahí). Viaja con el resto de los datos, así que también se sincroniza con el código.
+  pestaña **Progreso**. Viaja con el resto de los datos, así que también se sincroniza con
+  el código.
+  **Entrenamientos cargados después**: si alguien entrenó sin el teléfono, toca ese día en
+  el calendario → "Cargar un entrenamiento de este día" (`src/components/ManualWorkoutSheet.jsx`).
+  Elige qué día de la rutina hizo, cuánto duró más o menos (o "no me acuerdo"), destilda lo
+  que no hizo y, si se acuerda, anota series y pesos. Queda con `manual: true` y la etiqueta
+  "Cargado después": no tiene horarios medidos, cuenta para la semana y las series anotadas
+  van a "la vez pasada", gráficos y récords. Si se borra la entrada, se borran esas series.
   Detalles: si desmarca casillas y baja de la mitad durante el mismo entrenamiento, el
   registro se quita (por si fue sin querer), pero desmarcar días después no borra nada viejo;
   si pasan más de 12 h desde que arrancó, lo que tilde cuenta como un entrenamiento nuevo; y
@@ -80,14 +86,18 @@ Proyecto Vite + React listo para deployar en Vercel.
   La biblioteca (más de 220 ejercicios con equipo y traducción) está en
   `src/data/exercise-library.js`: para sumar uno, una fila. "Solo por hoy" vuelve solo al
   original al día siguiente; "Reemplazar" lo cambia para siempre.
-- **Agregar un ejercicio al día**: botón "Agregar ejercicio" al final de cada día, con
-  buscador, objetivo (atajos 3x10, 4x8…) y peso opcional. Fuera de edición se elige **solo
-  hoy** (desaparece solo al día siguiente; viene marcado si el día es hoy) o **para
-  siempre**. Lo de "solo hoy" no viaja en los links de rutina compartidos.
-- **Modo edición**: los cambios se aplican al instante; abajo aparece una barra con
-  Deshacer y Listo (sin diálogos). Cada ejercicio se toca para editarlo o eliminarlo en una
-  hoja grande (`src/components/ExerciseEditor.jsx`); se reordenan arrastrando la manija.
-  Editar un ejercicio cambiado "solo por hoy" lo deja así para siempre.
+- **Entrenar vs. editar** (la idea de cada modo):
+  - **Vista normal = entrenar hoy**: tildar, anotar series, cambiar un ejercicio y "Sumar
+    un ejercicio hoy", que aparece solo en el día que toca hoy (o el que ya arrancaste hoy).
+    Viene marcado "solo hoy" (desaparece solo al día siguiente), con opción "para siempre".
+  - **Editar (lápiz) = cambiar la rutina para siempre**: nombres, días de la semana,
+    agregar/editar/borrar/reordenar ejercicios, agregar o borrar días y rutinas. Los cambios
+    se aplican al instante; abajo hay una barra con el nombre de la rutina, Deshacer y Listo
+    (sin diálogos). Cada fila: manija para reordenar, tocarla abre la hoja para editarla
+    (`src/components/ExerciseEditor.jsx`) y el tacho borra directo (se puede deshacer).
+    "Reiniciar la semana" y "Agregar rutina nueva" quedan fuera de edición.
+  - Editar un ejercicio cambiado "solo por hoy" lo deja así para siempre. Lo de "solo hoy"
+    no viaja en los links de rutina compartidos.
 - **Guardado**: además del guardado normal (medio segundo después de cada cambio), todo se
   guarda en el momento en que la app pasa a segundo plano o se cierra.
 - **Joe's conoce tu historial**: a sus instrucciones se suma un resumen real (objetivo y
@@ -95,9 +105,13 @@ Proyecto Vite + React listo para deployar en Vercel.
   `buildHistoryContext` (`src/joe-prompt.js`). Hay botones rápidos en el chat para pedir el
   resumen de la semana, cómo vienen las cargas o ajustar la rutina a lo que se cumple.
 - **Compartir**:
-  - Rutina como link (botón de compartir arriba de la rutina): todo viaja dentro del link
-    (`#rutina=...`, `src/lib/share.js`), no usa servidor. Al abrirlo se ofrece cargarla,
-    traducida al idioma de quien la abre.
+  - Rutina como **link corto** (botón de compartir arriba de la rutina → hoja con WhatsApp,
+    más opciones y copiar, `src/components/ShareRoutineSheet.jsx`): la rutina se guarda en
+    la base (`api/routine-link.js`, dura un año) y el link queda tipo
+    `average-app.vercel.app/r/K7P2QMX` (`vercel.json` manda `/r/...` a la app). Si el
+    servidor no responde, usa el link largo de antes (todo dentro del link, `#rutina=...`).
+    Al abrirlo se ve quién la compartió y todos los días con sus ejercicios y series; si
+    viene en otro idioma se traduce, si no queda tal cual.
   - Tarjeta para historias de Instagram al completar un día o desde el historial
     (1080×1920, `src/lib/storyCard.js`). Al tocar compartir se elige entre dos plantillas
     (`src/components/StoryPicker.jsx`; la app recuerda la última elegida):
@@ -107,10 +121,13 @@ Proyecto Vite + React listo para deployar en Vercel.
   - **La rutina del mes de Joe**: se edita a mano en `public/rutina-del-mes.json` (adentro
     tiene las instrucciones). Aparece primera al elegir plantilla mientras `month` coincida
     con el mes actual; si no coincide, no se muestra.
-- **Compañeros** (pestaña Progreso): cada uno comparte un código de 6 letras y el otro ve
-  solo si fue o no esta semana (puntos, objetivo, semanas seguidas). Nada de feed ni likes.
-  Necesita el código de sincronización y la misma base de datos (ver abajo):
-  `api/buddy-publish.js` y `api/buddy-get.js`. Dejar de compartir borra el resumen.
+- **Compañeros** (pestaña Progreso): cada uno tiene un código de 6 letras. Es **de ida y
+  vuelta**: cuando sumás a alguien, quedan vinculados los dos en el servidor
+  (`api/buddy-link.js`) y cada uno ve solo si el otro fue esta semana (puntos, objetivo,
+  semanas seguidas). Solo se ven entre vinculados. Al que te sumó lo ves aparecer solo (con
+  un aviso). Se puede dejar de compartir con uno (X al lado del nombre, con aviso: ninguno
+  ve más al otro) o con todos ("Dejar de compartir", con aviso de que se pierden los
+  contactos). Necesita el código de sincronización y la misma base de datos (ver abajo).
 - **Joe's te escribe si dejás de entrenar**: si pasan 5 días sin anotar ningún
   entrenamiento (o 5 días desde que armaste la rutina sin estrenarla), Joe's deja un mensaje
   en el chat preguntando si está todo bien, con lo que te toca hoy o lo próximo de tu rutina,
@@ -138,7 +155,8 @@ Proyecto Vite + React listo para deployar en Vercel.
   solución sería agregar una function serverless chiquita en Vercel que haga de intermediario.
 - **Código de sincronización**: cada persona puede generar un código (tipo "Tigre57") desde
   Perfil o en el onboarding, y pegarlo en otro dispositivo para ver ahí el mismo perfil y las
-  mismas rutinas. Es la pieza que necesita más configuración de tu parte — está detallado en
+  mismas rutinas. Al generarlo en el inicio, la app lo muestra con su explicación (para qué
+  sirve, que no se recupera si se pierde) antes de pasar a elegir entrenador. Es la pieza que necesita más configuración de tu parte — está detallado en
   su propia sección más abajo. **Sin ese paso, el resto de la app sigue funcionando 100%
   local, como hasta ahora** — el código de sincronización es opcional.
 
@@ -168,10 +186,11 @@ api/
 ├── sync-generate.js   # POST — genera un código único (Nombre+2 dígitos) y lo crea vacío en KV
 ├── sync-get.js        # GET  — trae { data, apiKey } guardados bajo un código
 ├── sync-save.js       # POST — sobreescribe { data, apiKey } bajo un código existente
-├── buddy-publish.js   # POST — publica (o borra) el resumen semanal para compañeros
-└── buddy-get.js       # GET  — trae el resumen de un compañero por su código de 6 letras
+├── buddy-publish.js   # POST — publica el resumen semanal (o deja de compartir con todos)
+├── buddy-link.js      # POST — vincula / desvincula compañeros (de a dos) y lista los tuyos
+└── routine-link.js    # POST/GET — links cortos de rutinas compartidas (/r/XXXXXXX)
 ```
-Los compañeros usan la misma base: si la sincronización funciona, esto también.
+Los compañeros y los links cortos usan la misma base: si la sincronización funciona, esto también.
 
 **Nota de privacidad**: estas funciones no tienen ninguna verificación además del código en
 sí — tal como lo charlamos, el código funciona como usuario+contraseña juntos en uno. No hay
@@ -209,7 +228,9 @@ vercel
 ├── vite.config.js      # incluye vite-plugin-pwa (service worker / offline)
 ├── api/
 │   ├── sync-generate.js / sync-get.js / sync-save.js
-│   └── buddy-publish.js / buddy-get.js
+│   ├── buddy-publish.js / buddy-link.js
+│   └── routine-link.js
+├── vercel.json         # los links cortos /r/... abren la app
 ├── public/
 │   ├── rutina-del-mes.json  # la rutina del mes de Joe (editar a mano cada mes)
 │   ├── favicon.svg
@@ -231,6 +252,8 @@ vercel
     │   ├── ProgressChart.jsx    # gráfico de un ejercicio
     │   ├── ProgressTab.jsx      # pestaña Progreso: semana, historial, récords, compañeros
     │   ├── StoryPicker.jsx      # elegir la plantilla de tarjeta para historias
+    │   ├── ShareRoutineSheet.jsx # compartir la rutina con link corto
+    │   ├── ManualWorkoutSheet.jsx # cargar un entrenamiento hecho sin el teléfono
     │   └── HistoryCalendar.jsx  # calendario del historial
     ├── data/
     │   ├── exercise-library.js  # biblioteca: +220 ejercicios con equipo, patrón y traducciones

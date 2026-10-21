@@ -36,6 +36,8 @@ export const formatClock = (ts) => {
 };
 
 export const workoutDurationMs = (entry) => {
+  // Cargado después (sin el teléfono): la duración es la que eligió la persona, si se acordaba.
+  if (entry.manual) return entry.durationMin ? entry.durationMin * 60 * 1000 : null;
   const ms = (entry.completedAt || 0) - (entry.startedAt || 0);
   return ms >= 60 * 1000 && ms <= MAX_WORKOUT_MS ? ms : null;
 };

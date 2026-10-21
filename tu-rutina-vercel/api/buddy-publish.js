@@ -30,7 +30,7 @@ const sanitize = (s) => {
 };
 
 // POST { code: código de sincronización (secreto), summary }      → publica y devuelve { buddyCode }
-// POST { code, stop: true }                                         → deja de compartir
+// POST { code, stop: true }                                         → deja de compartir (con todos)
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Método no permitido' });
@@ -52,6 +52,10 @@ export default async function handler(req, res) {
 
     if (stop) {
       if (buddyCode) {
+        // Deja de compartir con todos: se borra el resumen y los vínculos en los dos sentidos.
+        const links = (await redis.smembers(`buddy-links:${buddyCode}`)) || [];
+        await Promise.all(links.map((other) => redis.srem(`buddy-links:${other}`, buddyCode)));
+        await redis.del(`buddy-links:${buddyCode}`);
         await redis.del(`buddy:${buddyCode}`);
         await redis.del(`sync-buddy:${code}`);
       }

@@ -1,7 +1,7 @@
 // Calendario mensual con los entrenamientos registrados y el detalle de cada día.
 import React, { useState } from 'react';
 import {
-  ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Clock, Check, X, Trash2, Share2,
+  ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Clock, Check, X, Trash2, Share2, Plus, PenLine,
 } from 'lucide-react';
 import { tr, trn, getLang } from '../i18n';
 import { WEEKDAY_INITIALS, weekdayLabel } from '../i18n-content';
@@ -13,7 +13,7 @@ import { formatSet } from '../lib/lifts';
 // Los registros viejos guardaban solo nombres; los nuevos guardan { name, done, sets }.
 export const entryExercises = (entry) => (entry.exercises || []).map((e) => (typeof e === 'string' ? { name: e, done: true } : e));
 
-export default function HistoryCalendar({ history, onDelete, onShare }) {
+export default function HistoryCalendar({ history, onDelete, onShare, onLogManual }) {
   const todayKey = localDateKey(Date.now());
   const byDate = {};
   history.forEach((h) => { (byDate[h.date] = byDate[h.date] || []).push(h); });
@@ -144,9 +144,12 @@ export default function HistoryCalendar({ history, onDelete, onShare }) {
               </div>
               <div className="history-entry-time">
                 <Clock size={13} />
-                {duration
+                {h.manual ? (
+                  <span>{duration ? <strong>≈ {formatDuration(duration)}</strong> : tr('manualNoTime')}</span>
+                ) : duration
                   ? <span>{formatClock(h.startedAt)} → {formatClock(h.completedAt)} · <strong>{formatDuration(duration)}</strong></span>
                   : <span>{tr('lastCheckAt', { time: formatClock(h.completedAt) })}</span>}
+                {h.manual && <span className="history-manual-tag"><PenLine size={11} /> {tr('manualTag')}</span>}
               </div>
               {totalCount > 0 && (
                 <div className={`history-entry-progress ${isFull ? 'is-full' : ''}`}>
@@ -180,6 +183,12 @@ export default function HistoryCalendar({ history, onDelete, onShare }) {
             </div>
           );
         })}
+        {/* Entrenaste sin el teléfono: se carga a mano para ese día. */}
+        {onLogManual && selected <= todayKey && (
+          <button type="button" className={`history-manual-btn ${selectedEntries.length ? 'is-secondary' : ''}`} onClick={() => onLogManual(selected)}>
+            <Plus size={15} /> {selectedEntries.length ? tr('manualLogAnother') : tr('manualLogBtn')}
+          </button>
+        )}
       </div>
     </div>
   );

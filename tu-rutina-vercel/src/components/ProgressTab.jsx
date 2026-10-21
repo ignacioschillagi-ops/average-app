@@ -167,15 +167,20 @@ function RecordsList({ lifts }) {
         const best = it.bests.maxKg ? formatSet(it.bests.maxKg) : it.bests.maxReps ? formatSet({ reps: it.bests.maxReps.reps }) : '—';
         return (
           <li key={it.key} className={`pg-record ${isOpen ? 'is-open' : ''}`}>
+            {/* Nombre completo arriba; la mejor marca y cuánto subió, abajo. */}
             <button type="button" className="pg-record-main" onClick={() => setOpen(isOpen ? null : it.key)} aria-expanded={isOpen}>
-              <span className="pg-record-name">{it.name}</span>
-              <span className="pg-record-best"><Trophy size={12} /> {best}</span>
-              {it.series.length > 1 && diff !== 0 && (
-                <span className={`pg-record-diff ${diff > 0 ? 'is-up' : 'is-down'}`}>
-                  {diff > 0 ? '+' : '−'}{formatKg(Math.abs(diff))}{bodyweight ? '' : ' kg'}
+              <span className="pg-record-text">
+                <span className="pg-record-name">{it.name}</span>
+                <span className="pg-record-stats">
+                  <span className="pg-record-best"><Trophy size={12} /> {best}</span>
+                  {it.series.length > 1 && diff !== 0 && (
+                    <span className={`pg-record-diff ${diff > 0 ? 'is-up' : 'is-down'}`}>
+                      {diff > 0 ? '+' : '−'}{formatKg(Math.abs(diff))}{bodyweight ? '' : ' kg'}
+                    </span>
+                  )}
                 </span>
-              )}
-              {isOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+              </span>
+              {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
             {isOpen && (
               <div className="pg-record-chart">
@@ -197,22 +202,34 @@ const prettyBuddyCode = (code) => (code && code.length === 6 ? `${code.slice(0, 
 
 function BuddyCard({ buddy, info, onRemove }) {
   const [confirm, setConfirm] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const s = info && info.summary;
+  const name = (s && s.name) || buddy.name || tr('buddyNoName');
+  const remove = async () => {
+    setRemoving(true);
+    const ok = await onRemove();
+    if (!ok) { setRemoving(false); setConfirm(false); }
+  };
   return (
-    <li className="pg-buddy">
+    <li className={`pg-buddy ${confirm ? 'is-confirming' : ''}`}>
       <div className="pg-buddy-head">
-        <span className="pg-buddy-name">{(s && s.name) || buddy.name || tr('buddyNoName')}</span>
-        {confirm ? (
-          <span className="pg-buddy-confirm">
-            <button type="button" className="history-delete-yes" onClick={onRemove}>{tr('deleteShort')}</button>
-            <button type="button" className="history-delete-no" onClick={() => setConfirm(false)}>{tr('cancel')}</button>
-          </span>
-        ) : (
-          <button type="button" className="icon-btn" onClick={() => setConfirm(true)} aria-label={tr('removeBuddy')}><X size={15} /></button>
+        <span className="pg-buddy-name">{name}</span>
+        {!confirm && (
+          <button type="button" className="icon-btn" onClick={() => setConfirm(true)} aria-label={tr('removeBuddyAria', { name })}><X size={15} /></button>
         )}
       </div>
+      {confirm && (
+        <div className="pg-buddy-confirm">
+          <p>{tr('buddyRemoveConfirm', { name })}</p>
+          <div>
+            <button type="button" className="pg-btn pg-btn-ghost" onClick={() => setConfirm(false)} disabled={removing}>{tr('cancel')}</button>
+            <button type="button" className="pg-btn pg-btn-danger" onClick={remove} disabled={removing}>
+              {removing ? <Loader2 size={14} className="spin" /> : null} {tr('buddyRemoveBtn')}
+            </button>
+          </div>
+        </div>
+      )}
       {!info && <span className="pg-buddy-status"><Loader2 size={13} className="spin" /> {tr('loadingShort')}</span>}
-      {info && info.error && <span className="pg-buddy-status">{info.error === 'notfound' ? tr('buddyNotFound') : tr('buddyError')}</span>}
       {s && (
         <>
           <span className="pg-buddy-status">
@@ -258,11 +275,12 @@ function BuddiesSection({ share, syncCode, syncBusy, buddies, buddyInfo, onEnabl
     <section className="pg-card">
       <div className="pg-section-head">
         <h2 className="pg-title"><Users size={17} /> {tr('buddiesTitle')}</h2>
-        {buddies.length > 0 && (
+        {share.enabled && (
           <button type="button" className="icon-btn" onClick={onRefresh} aria-label={tr('refresh')}><RefreshCw size={15} /></button>
         )}
       </div>
       <p className="pg-sub">{tr('buddiesIntro')}</p>
+      <p className="pg-sub pg-sub-note">{tr('buddiesMutualNote')}</p>
 
       <div className="pg-myshare">
         {!syncCode ? (
@@ -298,19 +316,26 @@ function BuddiesSection({ share, syncCode, syncBusy, buddies, buddyInfo, onEnabl
         </ul>
       )}
 
-      <div className="pg-addbuddy">
-        <input
-          value={input}
-          onChange={(e) => { setInput(e.target.value.toUpperCase()); setError(''); }}
-          placeholder={tr('buddyCodePlaceholder')}
-          maxLength={8}
-          autoCapitalize="characters"
-        />
-        <button type="button" className="pg-btn" onClick={add} disabled={busy || !input.trim()}>
-          {busy ? <Loader2 size={14} className="spin" /> : <UserPlus size={14} />} {tr('add')}
-        </button>
-      </div>
-      {error && <p className="pg-error">{error}</p>}
+      {share.enabled ? (
+        <>
+          <span className="pg-addbuddy-label">{tr('buddyAddLabel')}</span>
+          <div className="pg-addbuddy">
+            <input
+              value={input}
+              onChange={(e) => { setInput(e.target.value.toUpperCase()); setError(''); }}
+              placeholder={tr('buddyCodePlaceholder')}
+              maxLength={8}
+              autoCapitalize="characters"
+            />
+            <button type="button" className="pg-btn" onClick={add} disabled={busy || !input.trim()}>
+              {busy ? <Loader2 size={14} className="spin" /> : <UserPlus size={14} />} {tr('add')}
+            </button>
+          </div>
+          {error && <p className="pg-error">{error}</p>}
+        </>
+      ) : syncCode && (
+        <p className="pg-note">{tr('buddyAddNeedsShare')}</p>
+      )}
     </section>
   );
 }
@@ -318,7 +343,7 @@ function BuddiesSection({ share, syncCode, syncBusy, buddies, buddyInfo, onEnabl
 // ---------- Pestaña ----------
 
 export default function ProgressTab({
-  stats, history, lifts, onGoalChange, onAskJoe, onDeleteEntry, onShareEntry, buddyProps,
+  stats, history, lifts, onGoalChange, onAskJoe, onDeleteEntry, onShareEntry, onLogManual, buddyProps,
 }) {
   return (
     <div className="progress-screen">
@@ -329,8 +354,8 @@ export default function ProgressTab({
 
       <section className="pg-card pg-card-flat" id="historial">
         <h2 className="pg-title"><CalendarDays size={17} /> {tr('historyTitle')}</h2>
-        <p className="pg-sub">{tr('historySubtitle')}</p>
-        <HistoryCalendar history={history} onDelete={onDeleteEntry} onShare={onShareEntry} />
+        <p className="pg-sub">{tr('historySubtitle')} {tr('manualHintCalendar')}</p>
+        <HistoryCalendar history={history} onDelete={onDeleteEntry} onShare={onShareEntry} onLogManual={onLogManual} />
       </section>
 
       <RecordsSection lifts={lifts} />
