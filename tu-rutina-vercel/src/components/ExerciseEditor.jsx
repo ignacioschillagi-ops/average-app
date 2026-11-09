@@ -6,6 +6,7 @@ import { X, Trash2, Plus, Check, CalendarDays, Infinity as InfinityIcon } from '
 import { tr } from '../i18n';
 import ExerciseNameInput from './ExerciseNameInput';
 import useSheetDrag from '../lib/useSheetDrag';
+import useBackClose from '../lib/useBackClose';
 
 const TARGET_PRESETS = ['3x8', '3x10', '3x12', '4x8', '4x10', '4x12', '5x5', '3x15'];
 
@@ -28,6 +29,7 @@ export default function ExerciseEditor({
   const overlayRef = useRef(null);
   const nameRef = useRef(null);
   useSheetDrag(sheetRef, overlayRef, onClose);
+  useBackClose(onClose);
 
   const save = () => {
     const clean = name.trim();

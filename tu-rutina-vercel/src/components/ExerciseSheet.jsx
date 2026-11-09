@@ -22,6 +22,7 @@ import { restTimer, useRestTimer, formatTime } from '../lib/restTimer';
 import ProgressChart from './ProgressChart';
 import ExerciseNameInput from './ExerciseNameInput';
 import useSheetDrag from '../lib/useSheetDrag';
+import useBackClose from '../lib/useBackClose';
 
 const newId = () => Math.random().toString(36).slice(2, 10);
 // Número para un campo de texto, con la coma o el punto que corresponde al idioma.
@@ -362,6 +363,7 @@ export default function ExerciseSheet({
   const sheetRef = useRef(null);
   const overlayRef = useRef(null);
   useSheetDrag(sheetRef, overlayRef, onClose);
+  useBackClose(onClose);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };

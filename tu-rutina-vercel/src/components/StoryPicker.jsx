@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { X, Share2, Check, Loader2 } from 'lucide-react';
 import { tr } from '../i18n';
 import { shareImage } from '../lib/share';
+import useBackClose from '../lib/useBackClose';
 
 const PREF_KEY = 'story-template-v1';
 
@@ -20,6 +21,7 @@ const savePref = (id) => {
  * cards: [{ id, label, desc, render: () => Promise<Blob> }]
  */
 export default function StoryPicker({ cards, filename, onClose, onResult }) {
+  useBackClose(onClose);
   const [selected, setSelected] = useState(() => {
     const pref = readPref();
     return cards.some((c) => c.id === pref) ? pref : cards[0].id;

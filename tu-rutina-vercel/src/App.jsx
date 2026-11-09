@@ -32,6 +32,7 @@ import StoryPicker from './components/StoryPicker';
 import ShareRoutineSheet from './components/ShareRoutineSheet';
 import ManualWorkoutSheet from './components/ManualWorkoutSheet';
 import { coachNudgeFor } from './lib/coach';
+import useBackClose from './lib/useBackClose';
 import ExerciseSheet from './components/ExerciseSheet';
 import ExerciseEditor from './components/ExerciseEditor';
 import ProgressTab from './components/ProgressTab';
@@ -1171,6 +1172,7 @@ function TemplatePicker({ onPick, onBack, monthly }) {
 // ---------- Agregar rutina nueva (desde dentro de la app) ----------
 
 function TemplateBrowserModal({ onPick, onClose, monthly }) {
+  useBackClose(onClose);
   return (
     <div className="template-browser-screen">
       <button className="template-browser-close" onClick={onClose} aria-label={tr('close')}>
@@ -1197,6 +1199,7 @@ function TemplateBrowserModal({ onPick, onClose, monthly }) {
 }
 
 function PrivacyPolicyOverlay({ onClose }) {
+  useBackClose(onClose);
   const instagram = <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer">Instagram</a>;
   return (
     <div className="template-browser-screen">
@@ -1268,6 +1271,11 @@ function ProfileFaq() {
 
 function ConfirmDialog({ state, onCancel, onConfirm }) {
   if (!state) return null;
+  return <ConfirmDialogBox state={state} onCancel={onCancel} onConfirm={onConfirm} />;
+}
+
+function ConfirmDialogBox({ state, onCancel, onConfirm }) {
+  useBackClose(onCancel);
   const label = state.confirmLabel || tr('delete');
   const variant = state.variant || 'danger';
   return (
@@ -1609,6 +1617,12 @@ function EditBar({ routineName, onDone, onUndo, canUndo }) {
   );
 }
 
+// Mientras el panel del cronómetro está abierto, atrás lo cierra.
+function BackCloser({ onClose }) {
+  useBackClose(onClose);
+  return null;
+}
+
 function FloatingTimer({ raised }) {
   const [open, setOpen] = useState(false);
   const { remaining, running, justFinished, lastPreset } = useRestTimer();
@@ -1618,6 +1632,7 @@ function FloatingTimer({ raised }) {
     <div className={`timer-wrap ${raised ? 'timer-wrap-raised' : ''}`}>
       {open && (
         <>
+          <BackCloser onClose={() => setOpen(false)} />
           <div className="menu-backdrop" onClick={() => setOpen(false)} />
           <div className="timer-panel">
             <div className="timer-panel-header">
@@ -1838,13 +1853,99 @@ function BottomNav({ activeTab, onChange, chatUnread }) {
 
 // ---------- Chat con Joe's ----------
 
+// Joe's "escribe" la respuesta de a poco (dura entre 0,8 y 3,5 s según el largo; tocándola
+// se completa). Al mandar una pregunta, la pregunta queda arriba y la respuesta aparece
+// debajo: la pantalla no salta al final, se baja con el dedo (o con el botón de la flecha).
+const typingDurationMs = (len) => Math.min(3500, Math.max(800, len / 0.09));
+
 function ChatScreen({ messages, onSend, loading, error, onAddRoutine, onChangeKey, providerLabel, quickPrompts }) {
   const [input, setInput] = useState('');
   const listRef = useRef(null);
+  const spacerRef = useRef(null);
+  const rowRefs = useRef({});
+  const pinRef = useRef(null); // pregunta que queda arriba
+  const seenRef = useRef(null); // mensajes que ya estaban (esos no se animan)
+  if (seenRef.current === null) seenRef.current = new Set(messages.map((m) => m.id));
+  const [typing, setTyping] = useState(null); // { id, shown }
+  const [pinTick, setPinTick] = useState(0);
+  const [showDown, setShowDown] = useState(false);
+
+  // Mensajes nuevos: la pregunta se fija arriba y la respuesta de Joe's se escribe de a poco.
+  useEffect(() => {
+    const fresh = messages.filter((m) => !seenRef.current.has(m.id));
+    if (!fresh.length) return;
+    fresh.forEach((m) => seenRef.current.add(m.id));
+    const lastUser = [...fresh].reverse().find((m) => m.role === 'user');
+    if (lastUser) {
+      pinRef.current = lastUser.id;
+      setPinTick((t) => t + 1);
+    }
+    const lastBot = [...fresh].reverse().find((m) => m.role === 'assistant' && m.content);
+    if (lastBot) setTyping({ id: lastBot.id, shown: 0 });
+  }, [messages]);
 
   useEffect(() => {
-    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
-  }, [messages, loading]);
+    if (!typing) return undefined;
+    const msg = messages.find((m) => m.id === typing.id);
+    const len = msg && msg.content ? msg.content.length : 0;
+    if (!len || typing.shown >= len) {
+      setTyping(null);
+      return undefined;
+    }
+    const perTick = Math.max(1, Math.ceil(len / (typingDurationMs(len) / 30)));
+    const t = setTimeout(() => {
+      setTyping((tp) => (tp && tp.id === typing.id ? { ...tp, shown: Math.min(len, tp.shown + perTick) } : tp));
+    }, 30);
+    return () => clearTimeout(t);
+  }, [typing, messages]);
+
+  const contentEnd = () => {
+    const list = listRef.current;
+    const spacer = spacerRef.current;
+    return list ? list.scrollHeight - (spacer ? spacer.offsetHeight : 0) : 0;
+  };
+  const updateDownButton = () => {
+    const list = listRef.current;
+    if (!list) return;
+    setShowDown(contentEnd() - (list.scrollTop + list.clientHeight) > 120);
+  };
+
+  // Espacio libre abajo para que la pregunta pueda quedar arriba aunque la respuesta sea corta.
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const spacer = spacerRef.current;
+    if (!list || !spacer) return;
+    const pinEl = pinRef.current && rowRefs.current[pinRef.current];
+    if (pinEl) {
+      const below = (list.scrollHeight - spacer.offsetHeight) - pinEl.offsetTop;
+      spacer.style.height = `${Math.max(0, list.clientHeight - below - 8)}px`;
+    } else {
+      spacer.style.height = '0px';
+    }
+    updateDownButton();
+  });
+
+  // Al abrir el chat: lo último a la vista. Al preguntar: la pregunta arriba.
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
+  }, []);
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const pinEl = pinRef.current && rowRefs.current[pinRef.current];
+    if (!list || !pinEl || !pinTick) return;
+    const top = Math.max(0, pinEl.offsetTop - 8);
+    if (list.scrollTo) list.scrollTo({ top, behavior: 'smooth' });
+    else list.scrollTop = top;
+  }, [pinTick]);
+
+  const scrollToEnd = () => {
+    const list = listRef.current;
+    if (!list) return;
+    const top = Math.max(0, contentEnd() - list.clientHeight);
+    if (list.scrollTo) list.scrollTo({ top, behavior: 'smooth' });
+    else list.scrollTop = top;
+  };
 
   const handleSend = () => {
     if (!input.trim() || loading) return;
@@ -1865,19 +1966,31 @@ function ChatScreen({ messages, onSend, loading, error, onAddRoutine, onChangeKe
         </button>
       </div>
 
-      <div className="chat-messages" ref={listRef}>
+      <div className="chat-messages-wrap">
+      <div className="chat-messages" ref={listRef} onScroll={updateDownButton}>
         {messages.length === 0 && (
           <div className="chat-empty">
             <img src={FAVICON_DATA_URI} alt="" className="chat-empty-avatar" />
             <p>{tr('chatEmpty')}</p>
           </div>
         )}
-        {messages.map((m) => (
-          <div key={m.id} className={`chat-bubble-row ${m.role === 'user' ? 'from-user' : 'from-assistant'}`}>
+        {messages.map((m) => {
+          const isTyping = !!typing && typing.id === m.id;
+          return (
+          <div
+            key={m.id}
+            ref={(node) => { if (node) rowRefs.current[m.id] = node; else delete rowRefs.current[m.id]; }}
+            className={`chat-bubble-row ${m.role === 'user' ? 'from-user' : 'from-assistant'}`}
+          >
             {m.role === 'assistant' && <img src={FAVICON_DATA_URI} alt="" className="chat-msg-avatar" />}
-            <div className="chat-bubble">
-              {m.content && <p>{m.content}</p>}
-              {m.proposal && (
+            <div className={`chat-bubble ${isTyping ? 'is-typing' : ''}`} onClick={isTyping ? () => setTyping(null) : undefined}>
+              {m.content && (
+                <p>
+                  {isTyping ? m.content.slice(0, typing.shown) : m.content}
+                  {isTyping && <span className="chat-caret" aria-hidden="true" />}
+                </p>
+              )}
+              {!isTyping && m.proposal && (
                 <div className="routine-proposal-card">
                   <div className="routine-proposal-title">
                     <Dumbbell size={13} /> {m.proposal.name || tr('newRoutine')}
@@ -1906,7 +2019,7 @@ function ChatScreen({ messages, onSend, loading, error, onAddRoutine, onChangeKe
                   )}
                 </div>
               )}
-              {m.exerciseQuery && (
+              {!isTyping && m.exerciseQuery && (
                 <div className="exercise-lookup-card">
                   {m.exerciseLoading && (
                     <div className="exercise-lookup-loading">
@@ -1945,7 +2058,8 @@ function ChatScreen({ messages, onSend, loading, error, onAddRoutine, onChangeKe
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
         {loading && (
           <div className="chat-bubble-row from-assistant">
             <img src={FAVICON_DATA_URI} alt="" className="chat-msg-avatar" />
@@ -1953,6 +2067,13 @@ function ChatScreen({ messages, onSend, loading, error, onAddRoutine, onChangeKe
           </div>
         )}
         {error && <div className="chat-error">{error}</div>}
+        <div ref={spacerRef} className="chat-spacer" aria-hidden="true" />
+      </div>
+      {showDown && (
+        <button type="button" className="chat-down-btn" onClick={scrollToEnd} aria-label={tr('chatScrollDown')}>
+          <ChevronDown size={18} />
+        </button>
+      )}
       </div>
 
       {quickPrompts && quickPrompts.length > 0 && !loading && (
@@ -1983,6 +2104,7 @@ function ChatScreen({ messages, onSend, loading, error, onAddRoutine, onChangeKe
 // ---------- Rutina recibida por link ----------
 
 function SharedRoutineModal({ routine, onAccept, onDismiss }) {
+  useBackClose(onDismiss);
   const lang = getLang();
   const sameLang = routine.lang === lang;
   const tag = (t) => (sameLang ? t : translateTag(t, lang));
@@ -6188,13 +6310,30 @@ html, body { overflow-x: clip; }
 }
 .chat-header-text p { font-size: 11.5px; color: #8B8A85; margin: 2px 0 0; }
 
+.chat-messages-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .chat-messages {
+  position: relative;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 4px;
+}
+.chat-spacer { flex-shrink: 0; height: 0; margin-top: -12px; pointer-events: none; }
+.chat-caret {
+  display: inline-block; width: 7px; height: 1.05em; margin-left: 2px; vertical-align: -2px;
+  background: #B0AFA9; border-radius: 1px; animation: chat-caret-blink 0.9s steps(1) infinite;
+}
+@keyframes chat-caret-blink { 50% { opacity: 0; } }
+.chat-bubble.is-typing { cursor: pointer; }
+.chat-down-btn {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 2;
+  display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 999px;
+  border: 1px solid #3A3B3F; background: #232427; color: #EDEAE3; box-shadow: 0 6px 18px rgba(0,0,0,0.45); cursor: pointer;
+  animation: xs-fade 160ms ease;
 }
 
 .chat-empty {

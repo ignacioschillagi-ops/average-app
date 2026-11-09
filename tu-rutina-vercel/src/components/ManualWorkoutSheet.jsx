@@ -9,6 +9,7 @@ import { weekdayLabel, WEEKDAY_KEYS } from '../i18n-content';
 import { formatLongDate, dateFromKey } from '../lib/dates';
 import { planSets, lastSession, formatSet, parseNumber } from '../lib/lifts';
 import useSheetDrag from '../lib/useSheetDrag';
+import useBackClose from '../lib/useBackClose';
 
 const DURATIONS = [30, 45, 60, 75, 90, 120];
 const durationLabel = (min) => {
@@ -23,6 +24,7 @@ export default function ManualWorkoutSheet({ date, variants, activeVariantId, li
   const sheetRef = useRef(null);
   const overlayRef = useRef(null);
   useSheetDrag(sheetRef, overlayRef, onClose);
+  useBackClose(onClose);
 
   const usable = variants.filter((v) => (v.days || []).length);
   const dateWeekday = WEEKDAY_KEYS[(dateFromKey(date).getDay() + 6) % 7];

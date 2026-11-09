@@ -3,61 +3,100 @@
 // El formato de los bloques ```routine y ```exercise-lookup es el mismo en los 3 idiomas
 // (la app los lee igual); los días de la semana pueden venir en cualquiera de los 3.
 
-import { weekdayLabel, goalLabel, translateExerciseName } from './i18n-content';
+import {
+  weekdayLabel, goalLabel, translateExerciseName, normalizeText, WEEKDAY_KEYS,
+} from './i18n-content';
 import { weeklyGoalOf, weeklyStats } from './lib/weekly';
 import { progressSeries, formatSet } from './lib/lifts';
-import { localDateKey, weekKeyOf, addDaysKey, daysBetweenKeys } from './lib/dates';
+import {
+  localDateKey, weekKeyOf, addDaysKey, daysBetweenKeys, dateFromKey, workoutDurationMs, formatDuration,
+} from './lib/dates';
 
 // Etiquetas del bloque de historial, por idioma.
+// La idea: la meta es entrenar N días por semana. Cuentan todos los entrenamientos, de la
+// rutina que sea y en el día de la semana que sea; no importa si coinciden con lo planeado.
 const H = {
   es: {
     header: 'Historial real de la persona (usalo cuando te pida un resumen, cómo viene o ajustes; no lo recites entero si no viene al caso):',
-    goal: (g, c) => `Objetivo semanal: ${g} entrenamientos. Esta semana lleva ${c}.`,
-    weeks: (list) => `Semanas anteriores (de la más vieja a la pasada): ${list}.`,
-    streak: (n) => `Semanas seguidas cumpliendo el objetivo (con margen de un día menos): ${n}.`,
-    last: (date, n) => `Último entrenamiento: ${date} (hace ${n} días).`,
+    today: (d) => `Hoy es ${d}.`,
+    goal: (g) => `Meta: ${g} entrenamientos por semana. Cuenta cualquier entrenamiento, de cualquier rutina y en cualquier día de la semana.`,
+    thisWeek: (from, c, g) => `ESTA SEMANA (en curso, del ${from} a hoy): ${c} de ${g} entrenamientos.`,
+    lastWeek: (from, to, c, g) => `Semana pasada (del ${from} al ${to}, ya terminó): ${c} de ${g}.`,
+    olderWeeks: (list) => `Semanas anteriores (de la más vieja a la más nueva): ${list}.`,
+    workout: (day, label, routine, done, total, dur, manual) => `  - ${day}: ${label} (${routine}), ${done} de ${total} ejercicios${dur ? `, ${dur}` : ''}${manual ? ', cargado después a mano' : ''}`,
+    noWorkouts: '  - (todavía ninguno)',
+    streak: (n) => `Semanas seguidas cumpliendo la meta (con margen de un día menos): ${n}.`,
+    last: (date, n) => `Último entrenamiento: ${date} (${n === 1 ? 'ayer' : `hace ${n} días`}).`,
     lastToday: (date) => `Último entrenamiento: ${date} (hoy).`,
     none: 'Todavía no registró ningún entrenamiento.',
-    adherence: 'Cuántas de las últimas 4 semanas entrenó cada día de su rutina activa:',
-    adherenceLine: (day, tag, n) => `- ${day} [${tag}]: ${n} de 4`,
+    trained: (list) => `Lo que entrenó en las últimas 2 semanas (por tipo de día): ${list}.`,
+    missing: (list) => `Días de su rutina activa que no hizo en las últimas 2 semanas: ${list}.`,
     loads: 'Cargas (primera vs. última sesión de las últimas 6 semanas):',
     loadLine: (name, a, b, n) => `- ${name}: ${a} → ${b} (${n} sesiones)`,
     loadOnce: (name, a) => `- ${name}: ${a} (1 sesión)`,
     prs: 'Récords personales de las últimas 2 semanas:',
-    style: 'Si te pide el resumen de la semana: decile cuántos entrenamientos hizo contra su objetivo, qué cargas subieron, qué días o grupos viene salteando, y una o dos sugerencias concretas. Breve y con tu estilo. Si te pide ajustar la rutina a lo que realmente cumple, proponé una versión (con el bloque "routine") con la cantidad de días que de verdad viene entrenando.',
+    style: (from) => `Cómo usar esto:
+- Si te pide "el resumen de mi semana" o "esta semana", hablá de ESTA SEMANA (la que está haciendo, del ${from} a hoy), aunque esté en curso. Solo si esta semana todavía no tiene ningún entrenamiento y hoy es lunes o martes, resumí la semana pasada aclarando que es la que acaba de terminar.
+- Sé flexible con los días: la meta es la cantidad de entrenamientos de la semana, no que coincidan con el día de la semana planeado ni que sean de la misma rutina. Si mezcló rutinas o cambió los días, cuenta igual; no lo marques como falta ni le reproches haber entrenado otro día.
+- En el resumen: cuántos entrenamientos lleva contra la meta (y cuántos le faltan si la semana sigue), qué cargas subieron, qué grupos o tipos de día viene dejando de lado en las últimas semanas (no qué días de la semana), y una o dos sugerencias concretas. Breve y con tu estilo.
+- Si te pide ajustar la rutina a lo que realmente cumple, proponé una versión (con el bloque "routine") con la cantidad de días que de verdad viene entrenando.`,
   },
   en: {
     header: "The person's real history (use it when they ask for a summary, how they're doing, or adjustments; don't recite it all if it isn't relevant):",
-    goal: (g, c) => `Weekly goal: ${g} workouts. This week so far: ${c}.`,
-    weeks: (list) => `Previous weeks (oldest to last week): ${list}.`,
+    today: (d) => `Today is ${d}.`,
+    goal: (g) => `Goal: ${g} workouts per week. Any workout counts, from any routine and on any day of the week.`,
+    thisWeek: (from, c, g) => `THIS WEEK (in progress, from ${from} to today): ${c} of ${g} workouts.`,
+    lastWeek: (from, to, c, g) => `Last week (from ${from} to ${to}, already over): ${c} of ${g}.`,
+    olderWeeks: (list) => `Earlier weeks (oldest to newest): ${list}.`,
+    workout: (day, label, routine, done, total, dur, manual) => `  - ${day}: ${label} (${routine}), ${done} of ${total} exercises${dur ? `, ${dur}` : ''}${manual ? ', logged later by hand' : ''}`,
+    noWorkouts: '  - (none yet)',
     streak: (n) => `Weeks in a row meeting the goal (with one day of slack): ${n}.`,
-    last: (date, n) => `Last workout: ${date} (${n} days ago).`,
+    last: (date, n) => `Last workout: ${date} (${n === 1 ? 'yesterday' : `${n} days ago`}).`,
     lastToday: (date) => `Last workout: ${date} (today).`,
     none: "They haven't logged any workouts yet.",
-    adherence: 'How many of the last 4 weeks they trained each day of their active routine:',
-    adherenceLine: (day, tag, n) => `- ${day} [${tag}]: ${n} of 4`,
+    trained: (list) => `What they trained in the last 2 weeks (by type of day): ${list}.`,
+    missing: (list) => `Days of their active routine they haven't done in the last 2 weeks: ${list}.`,
     loads: 'Loads (first vs. latest session in the last 6 weeks):',
     loadLine: (name, a, b, n) => `- ${name}: ${a} → ${b} (${n} sessions)`,
     loadOnce: (name, a) => `- ${name}: ${a} (1 session)`,
     prs: 'Personal records in the last 2 weeks:',
-    style: 'If they ask for their weekly summary: tell them how many workouts they did against their goal, which loads went up, which days or muscle groups they keep skipping, and one or two concrete suggestions. Short and in your style. If they ask you to adjust the routine to what they actually do, propose a version (with the "routine" block) with the number of days they really train.',
+    style: (from) => `How to use this:
+- If they ask for "my weekly summary" or "this week", talk about THIS WEEK (the one they're in, from ${from} to today), even if it isn't over. Only if this week has no workouts yet and today is Monday or Tuesday, summarize last week and say it's the one that just ended.
+- Be flexible about days: the goal is the number of workouts in the week, not matching the planned weekday or sticking to one routine. If they mixed routines or moved days around, it still counts; don't treat it as missing or scold them for training on another day.
+- In the summary: how many workouts they have against the goal (and how many are left if the week isn't over), which loads went up, which muscle groups or types of day they've been leaving out in recent weeks (not which weekdays), and one or two concrete suggestions. Short and in your style.
+- If they ask you to adjust the routine to what they actually do, propose a version (with the "routine" block) with the number of days they really train.`,
   },
   it: {
     header: 'Storico reale della persona (usalo quando ti chiede un riepilogo, come sta andando o modifiche; non recitarlo tutto se non serve):',
-    goal: (g, c) => `Obiettivo settimanale: ${g} allenamenti. Questa settimana finora: ${c}.`,
-    weeks: (list) => `Settimane precedenti (dalla più vecchia alla scorsa): ${list}.`,
+    today: (d) => `Oggi è ${d}.`,
+    goal: (g) => `Obiettivo: ${g} allenamenti a settimana. Conta qualsiasi allenamento, di qualsiasi scheda e in qualsiasi giorno della settimana.`,
+    thisWeek: (from, c, g) => `QUESTA SETTIMANA (in corso, da ${from} a oggi): ${c} allenamenti su ${g}.`,
+    lastWeek: (from, to, c, g) => `Settimana scorsa (da ${from} a ${to}, già finita): ${c} su ${g}.`,
+    olderWeeks: (list) => `Settimane precedenti (dalla più vecchia alla più recente): ${list}.`,
+    workout: (day, label, routine, done, total, dur, manual) => `  - ${day}: ${label} (${routine}), ${done} esercizi su ${total}${dur ? `, ${dur}` : ''}${manual ? ', registrato dopo a mano' : ''}`,
+    noWorkouts: '  - (ancora nessuno)',
     streak: (n) => `Settimane di fila con l'obiettivo raggiunto (con un giorno di margine): ${n}.`,
-    last: (date, n) => `Ultimo allenamento: ${date} (${n} giorni fa).`,
+    last: (date, n) => `Ultimo allenamento: ${date} (${n === 1 ? 'ieri' : `${n} giorni fa`}).`,
     lastToday: (date) => `Ultimo allenamento: ${date} (oggi).`,
     none: 'Non ha ancora registrato nessun allenamento.',
-    adherence: 'In quante delle ultime 4 settimane ha allenato ogni giorno della sua scheda attiva:',
-    adherenceLine: (day, tag, n) => `- ${day} [${tag}]: ${n} su 4`,
+    trained: (list) => `Cosa ha allenato nelle ultime 2 settimane (per tipo di giorno): ${list}.`,
+    missing: (list) => `Giorni della sua scheda attiva che non ha fatto nelle ultime 2 settimane: ${list}.`,
     loads: 'Carichi (prima e ultima sessione delle ultime 6 settimane):',
     loadLine: (name, a, b, n) => `- ${name}: ${a} → ${b} (${n} sessioni)`,
     loadOnce: (name, a) => `- ${name}: ${a} (1 sessione)`,
     prs: 'Record personali delle ultime 2 settimane:',
-    style: 'Se ti chiede il riepilogo della settimana: digli quanti allenamenti ha fatto rispetto all\'obiettivo, quali carichi sono saliti, quali giorni o gruppi muscolari sta saltando, e uno o due suggerimenti concreti. Breve e col tuo stile. Se ti chiede di adattare la scheda a quello che fa davvero, proponi una versione (con il blocco "routine") con il numero di giorni in cui si allena davvero.',
+    style: (from) => `Come usarlo:
+- Se ti chiede "il riepilogo della mia settimana" o "questa settimana", parla di QUESTA SETTIMANA (quella in corso, da ${from} a oggi), anche se non è finita. Solo se questa settimana non ha ancora nessun allenamento e oggi è lunedì o martedì, riassumi la settimana scorsa dicendo che è quella appena finita.
+- Sii flessibile con i giorni: l'obiettivo è il numero di allenamenti della settimana, non che coincidano con il giorno previsto né che siano della stessa scheda. Se ha mescolato schede o spostato i giorni, conta lo stesso; non segnarlo come mancanza e non rimproverarlo per essersi allenato un altro giorno.
+- Nel riepilogo: quanti allenamenti ha rispetto all'obiettivo (e quanti ne mancano se la settimana non è finita), quali carichi sono saliti, quali gruppi muscolari o tipi di giorno sta trascurando nelle ultime settimane (non quali giorni della settimana), e uno o due suggerimenti concreti. Breve e col tuo stile.
+- Se ti chiede di adattare la scheda a quello che fa davvero, proponi una versione (con il blocco "routine") con il numero di giorni in cui si allena davvero.`,
   },
+};
+
+// "Lunes 2026-11-09": día de la semana en el idioma + fecha sin ambigüedad.
+const dayWithDate = (key, lang) => {
+  const d = dateFromKey(key);
+  return `${weekdayLabel(WEEKDAY_KEYS[(d.getDay() + 6) % 7], lang)} ${key}`;
 };
 
 const buildHistoryContext = (data, lang) => {
@@ -65,27 +104,61 @@ const buildHistoryContext = (data, lang) => {
   const now = Date.now();
   const today = localDateKey(now);
   const history = data.history || [];
-  const stats = weeklyStats(history, weeklyGoalOf(data), now, 5);
-  const lines = [L.header, L.goal(stats.goal, stats.thisWeekCount)];
-  const pastWeeks = stats.weeks.slice(0, -1).filter((w) => w.status !== 'none');
-  if (pastWeeks.length) lines.push(L.weeks(pastWeeks.map((w) => w.count).join(', ')));
+  const goal = weeklyGoalOf(data);
+  const stats = weeklyStats(history, goal, now, 6);
+  const thisWeekKey = weekKeyOf(now);
+  const lastWeekKey = addDaysKey(thisWeekKey, -7);
+  const variantName = (h) => {
+    const v = (data.variants || []).find((x) => x.id === h.variantId);
+    return (v && v.name) || h.variantName || '';
+  };
+  const workoutLines = (fromKey, toKey) => {
+    const list = history
+      .filter((h) => h && h.date >= fromKey && h.date <= toKey)
+      .sort((a, b) => (a.date === b.date ? (a.completedAt || 0) - (b.completedAt || 0) : (a.date < b.date ? -1 : 1)));
+    if (!list.length) return [L.noWorkouts];
+    return list.map((h) => {
+      const ms = workoutDurationMs(h);
+      const done = h.doneCount != null ? h.doneCount : (h.exercises || []).length;
+      const total = h.totalCount != null ? h.totalCount : (h.exercises || []).length;
+      return L.workout(dayWithDate(h.date, lang), h.label || '', variantName(h), done, total, ms ? `${h.manual ? '≈ ' : ''}${formatDuration(ms)}` : '', !!h.manual);
+    });
+  };
+
+  const lines = [L.header, L.today(dayWithDate(today, lang)), L.goal(goal)];
+  const thisWeek = stats.weeks[stats.weeks.length - 1];
+  const lastWeek = stats.weeks[stats.weeks.length - 2];
+  lines.push(L.thisWeek(dayWithDate(thisWeekKey, lang), thisWeek.count, goal));
+  workoutLines(thisWeekKey, today).forEach((l) => lines.push(l));
+  if (lastWeek && lastWeek.status !== 'none') {
+    lines.push(L.lastWeek(dayWithDate(lastWeekKey, lang), dayWithDate(addDaysKey(lastWeekKey, 6), lang), lastWeek.count, goal));
+    workoutLines(lastWeekKey, addDaysKey(lastWeekKey, 6)).forEach((l) => lines.push(l));
+  }
+  const older = stats.weeks.slice(0, -2).filter((w) => w.status !== 'none');
+  if (older.length) lines.push(L.olderWeeks(older.map((w) => `${w.week}: ${w.count}`).join(', ')));
   lines.push(L.streak(stats.streak));
   if (stats.lastDate) {
     const n = daysBetweenKeys(stats.lastDate, today);
-    lines.push(n <= 0 ? L.lastToday(stats.lastDate) : L.last(stats.lastDate, n));
+    lines.push(n <= 0 ? L.lastToday(dayWithDate(stats.lastDate, lang)) : L.last(dayWithDate(stats.lastDate, lang), n));
   } else {
     lines.push(L.none);
   }
 
-  // Cumplimiento por día de la rutina activa (últimas 4 semanas, incluida esta).
-  const active = (data.variants || []).find((v) => v.id === data.activeVariant);
-  if (active && (active.days || []).length && history.length) {
-    const fromWeek = addDaysKey(weekKeyOf(now), -21);
-    lines.push(L.adherence);
-    active.days.forEach((d) => {
-      const weeks = new Set(history.filter((h) => h.dayId === d.id && h.date >= fromWeek).map((h) => weekKeyOf(h.date)));
-      lines.push(L.adherenceLine(weekdayLabel(d.weekday, lang), d.tagLabel, weeks.size));
-    });
+  // Qué tipos de día entrenó en las últimas 2 semanas (de cualquier rutina) y cuáles de la
+  // rutina activa no aparecen: así habla de grupos que deja de lado, no de días de la semana.
+  const twoWeeksAgo = addDaysKey(today, -13);
+  const recent = history.filter((h) => h && h.date >= twoWeeksAgo);
+  if (recent.length) {
+    const counts = {};
+    recent.forEach((h) => { const k = (h.label || '').trim() || '?'; counts[k] = (counts[k] || 0) + 1; });
+    lines.push(L.trained(Object.entries(counts).map(([k, n]) => `${k} ×${n}`).join(', ')));
+    const active = (data.variants || []).find((v) => v.id === data.activeVariant);
+    if (active) {
+      const done = new Set(recent.map((h) => normalizeText(h.label || '')));
+      const doneIds = new Set(recent.map((h) => h.dayId));
+      const skipped = (active.days || []).filter((d) => !doneIds.has(d.id) && !done.has(normalizeText(d.tagLabel || '')));
+      if (skipped.length) lines.push(L.missing(skipped.map((d) => d.tagLabel || weekdayLabel(d.weekday, lang)).join(', ')));
+    }
   }
 
   // Cargas de las últimas 6 semanas y récords recientes.
@@ -117,7 +190,7 @@ const buildHistoryContext = (data, lang) => {
     lines.push(L.prs);
     prLines.slice(0, 6).forEach((l) => lines.push(l));
   }
-  lines.push(L.style);
+  lines.push(L.style(dayWithDate(thisWeekKey, lang)));
   return lines.join('\n');
 };
 

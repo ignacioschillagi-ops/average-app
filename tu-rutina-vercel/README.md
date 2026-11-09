@@ -100,10 +100,21 @@ Proyecto Vite + React listo para deployar en Vercel.
     no viaja en los links de rutina compartidos.
 - **Guardado**: además del guardado normal (medio segundo después de cada cambio), todo se
   guarda en el momento en que la app pasa a segundo plano o se cierra.
-- **Joe's conoce tu historial**: a sus instrucciones se suma un resumen real (objetivo y
-  semanas, días que más se saltean, cargas de las últimas 6 semanas, récords) armado en
-  `buildHistoryContext` (`src/joe-prompt.js`). Hay botones rápidos en el chat para pedir el
-  resumen de la semana, cómo vienen las cargas o ajustar la rutina a lo que se cumple.
+- **Joe's conoce tu historial**: a sus instrucciones se suma un resumen real armado en
+  `buildHistoryContext` (`src/joe-prompt.js`): la fecha de hoy, la meta semanal, los
+  entrenamientos de esta semana y de la pasada (con fecha, tipo de día y rutina, sumando
+  todas las rutinas), qué tipos de día entrenó en las últimas 2 semanas y cuáles de la
+  rutina activa no aparecen, cargas de las últimas 6 semanas y récords. Le pide ser flexible:
+  la meta es la cantidad de entrenamientos de la semana, sin importar el día de la semana ni
+  la rutina; y "el resumen de mi semana" es la semana en curso (la pasada solo si esta
+  todavía está vacía y es lunes o martes). Hay botones rápidos en el chat para pedir el
+  resumen, cómo vienen las cargas o ajustar la rutina a lo que se cumple.
+- **Chat**: la respuesta de Joe's se escribe de a poco (entre 0,8 y 3,5 s según el largo;
+  tocándola se completa). Al preguntar, la pregunta queda arriba y la respuesta aparece
+  debajo sin mover la pantalla; si sigue más abajo aparece una flecha para ir al final.
+- **Botón atrás**: con cualquier ventana abierta (hoja del ejercicio, editor, compartir,
+  diálogos, cronómetro...), atrás la cierra en vez de salir de la app
+  (`src/lib/useBackClose.js`).
 - **Compartir**:
   - Rutina como **link corto** (botón de compartir arriba de la rutina → hoja con WhatsApp,
     más opciones y copiar, `src/components/ShareRoutineSheet.jsx`): la rutina se guarda en
@@ -267,5 +278,6 @@ vercel
         ├── share.js      # links de rutina y compartir archivos
         ├── storyCard.js  # tarjeta para historias
         ├── useSheetDrag.js # cerrar hojas arrastrando hacia abajo
+        ├── useBackClose.js # el botón atrás cierra la ventana abierta
         └── wger.js       # búsqueda en wger.de (tarjetas del chat)
 ```

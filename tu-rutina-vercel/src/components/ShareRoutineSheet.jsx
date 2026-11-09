@@ -6,6 +6,7 @@ import { X, Copy, Check, Share2, Loader2, MessageCircle, Link2 } from 'lucide-re
 import { tr, trn } from '../i18n';
 import { createRoutineLink } from '../lib/share';
 import useSheetDrag from '../lib/useSheetDrag';
+import useBackClose from '../lib/useBackClose';
 
 const prettyUrl = (url) => String(url || '').replace(/^https?:\/\//, '');
 
@@ -15,6 +16,7 @@ export default function ShareRoutineSheet({ variant, lang, from, onClose }) {
   const sheetRef = useRef(null);
   const overlayRef = useRef(null);
   useSheetDrag(sheetRef, overlayRef, onClose);
+  useBackClose(onClose);
 
   useEffect(() => {
     let alive = true;
